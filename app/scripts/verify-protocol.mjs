@@ -100,22 +100,22 @@ const DEV_SECRET = 'TEST-VECTOR-SECRET-ONLY';
   assert.equal(device.getSnapshot().light, 'bright');
   assert.equal(device.getSnapshot().led, 0);
 
-  // Entra na faixa de histerese (1650) -> mantem claro
-  device.setSimulatedLdr(1650);
+  // Entra na faixa de histerese (1100) -> mantem claro
+  device.setSimulatedLdr(1100);
   assert.equal(device.getSnapshot().light, 'bright');
 
-  // Cai abaixo de 1500 (1200) -> entra em dark e acende LED localmente
-  device.setSimulatedLdr(1200);
+  // Cai abaixo de 950 (700) -> entra em dark e acende LED localmente
+  device.setSimulatedLdr(700);
   assert.equal(device.getSnapshot().light, 'dark');
   assert.equal(device.getSnapshot().led, 1);
 
-  // Sobe para 1650 (dentro da histerese) -> mantem dark e LED aceso
-  device.setSimulatedLdr(1650);
+  // Sobe para 1100 (dentro da histerese) -> mantem dark e LED aceso
+  device.setSimulatedLdr(1100);
   assert.equal(device.getSnapshot().light, 'dark');
   assert.equal(device.getSnapshot().led, 1);
 
-  // Sobe acima de 1800 (2100) -> volta para claro e apaga LED
-  device.setSimulatedLdr(2100);
+  // Sobe acima de 1250 (1500) -> volta para claro e apaga LED
+  device.setSimulatedLdr(1500);
   assert.equal(device.getSnapshot().light, 'bright');
   assert.equal(device.getSnapshot().led, 0);
 

@@ -126,14 +126,14 @@ export const App: React.FC = () => {
       engine.loadDungeon(1, 'bright', false);
       setActiveTab('game');
     } else if (demo === 'dark') {
-      setSimLdrRaw(760);
-      service.connectSimulator(760);
+      setSimLdrRaw(490);
+      service.connectSimulator(490);
       engine.loadDungeon(2, 'dark', false);
       setActiveTab('game');
     } else if (demo === 'telemetry' || demo === 'control') {
-      const sampleRaws = [2950, 2820, 2650, 2180, 1740, 1420, 1080, 840, 790, 920, 1590, 1980, 2540, 2890];
+      const sampleRaws = [2100, 1950, 1730, 1520, 1290, 880, 620, 490, 510, 740, 1100, 1450, 1710, 1890];
       const synthetic: TelemetryRecord[] = sampleRaws.map((raw, idx) => {
-        const dark = raw < 1500;
+        const dark = raw < 950;
         return {
           id: idx + 1,
           time: `19:4${Math.floor(idx / 6)}:${String((idx * 4) % 60).padStart(2, '0')}`,

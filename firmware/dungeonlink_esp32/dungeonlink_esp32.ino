@@ -472,8 +472,12 @@ void setup() {
   pinMode(PIN_BUTTON, INPUT_PULLUP);
   pinMode(PIN_LED_RED, OUTPUT);
   pinMode(PIN_LED_BLE, OUTPUT);
-  digitalWrite(PIN_LED_RED, LOW);
   digitalWrite(PIN_LED_BLE, LOW);
+
+  // Auto-teste visual do LED vermelho no boot (500 ms)
+  digitalWrite(PIN_LED_RED, HIGH);
+  delay(500);
+  digitalWrite(PIN_LED_RED, LOW);
 
   analogReadResolution(12);
   analogSetPinAttenuation(PIN_LDR, ADC_11db);
@@ -544,6 +548,15 @@ void loop() {
   // 6. Atualiza LEDs fisicos sem bloqueio
   updateRedLedOutput();
   updateBleStatusLed();
+
+  // 7. Log periodico de diagnostico de bancada (nao imprime segredos)
+  static unsigned long lastDiagMs = 0;
+  if (now - lastDiagMs >= 1500UL) {
+    lastDiagMs = now;
+    DL_LOGF("[DIAG] LDR_raw=%d (%d%%) | dark=%d | LED_D26=%d | BTN_D27=%s\n",
+            ldrRawAvg, ldrPct, isDark ? 1 : 0, targetLedState ? 1 : 0,
+            stableButtonState == LOW ? "PRESSED" : "RELEASED");
+  }
 
   delay(10);
 }

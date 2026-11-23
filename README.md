@@ -13,7 +13,7 @@ Quando a luz da sala muda, o jogo muda de tema na hora e o LED físico responde 
 1. **Percepção:** sensor de luz **LDR** (`D34`), **botão tátil** (`D27`), **LED vermelho** (`D26`) e **LED azul da placa** (`D2`).
 2. **Rede:** conexão **Bluetooth Low Energy (BLE)** direto entre ESP32 e celular, trocando mensagens JSON assinadas.
 3. **Processamento:**
-   - **No ESP32:** lê a luz a cada 100 ms, faz média de 8 leituras, usa histerese (`< 1500` escuro / `> 1800` claro) para o LED não ficar piscando e acende o LED vermelho no escuro **sem precisar de internet ou celular**. Também confere a assinatura de segurança de cada comando recebido.
+   - **No ESP32:** lê a luz a cada 100 ms, faz média de 8 leituras, usa histerese (`< 950` escuro / `> 1250` claro) para o LED não ficar piscando e acende o LED vermelho no escuro **sem precisar de internet ou celular**. Também confere a assinatura de segurança de cada comando recebido.
    - **No celular:** confere a assinatura dos dados recebidos, roda o jogo 2D e guarda o histórico.
 4. **Aplicação:** app Android com 3 fases (2 salas, inimigo e portal), mudança ao vivo entre claro/escuro, gráfico de histórico e painel de controle/segurança.
 
