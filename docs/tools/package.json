@@ -1,0 +1,10 @@
+{
+  "name": "dungeonlink-doc-tools",
+  "version": "1.0.0",
+  "private": true,
+  "type": "module",
+  "dependencies": {
+    "playwright": "^1.49.1",
+    "pptxgenjs": "^3.12.0"
+  }
+}

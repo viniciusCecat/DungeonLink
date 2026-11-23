@@ -1,0 +1,32 @@
+# Credenciais e segredos (nunca versionar)
+firmware/dungeonlink_esp32/secrets.h
+app/.env
+app/.env.local
+app/.env.*.local
+
+# Dependencias e builds JS
+app/node_modules/
+app/dist/
+docs/relatorio/node_modules/
+docs/slides/node_modules/
+docs/tools/node_modules/
+
+# Android / Gradle local e builds
+app/android/local.properties
+app/android/.gradle/
+app/android/app/build/
+app/android/build/
+app/android/capacitor-cordova-android-plugins/build/
+*.apk
+*.aab
+
+# Pacote final local de entrega (binario grande; PDFs e slides podem ser regenerados)
+dist-entrega/
+
+# Logs, sistema e editores
+*.log
+npm-debug.log*
+.DS_Store
+Thumbs.db
+.vscode/
+.idea/
