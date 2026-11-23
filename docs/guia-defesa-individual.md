@@ -27,9 +27,9 @@ Na sala, os slides são no formato **Pitch** (sem código, explicando o problema
 
 ### Sobre os requisitos obrigatórios (R1 a R5)
 - **Qual é a regra local (R2) que funciona sem internet?**
-  - *Resposta:* Mesmo sem Wi-Fi e sem celular conectado, o ESP32 lê o LDR a cada 100 ms. No modo padrão (`auto`), se ficar escuro (`< 950`), ele acende o LED vermelho sozinho; se clarear (`> 1250`), ele apaga.
-- **Por que usaram dois valores (950 e 1250) em vez de um número só?**
-  - *Resposta:* Se usasse um valor só, qualquer sombrinha ou ruído na luz faria o LED e o tema do jogo ficarem piscando sem parar. Essa folga de 300 pontos entre 950 e 1250 se chama **histerese** e deixa a troca estável.
+  - *Resposta:* Mesmo sem Wi-Fi e sem celular conectado, o ESP32 lê o LDR a cada 100 ms. No modo padrão (`auto`), se ficar escuro (`< 620`), ele acende o LED vermelho sozinho; se clarear (`> 780`), ele apaga.
+- **Por que usaram dois valores (620 e 780) em vez de um número só?**
+  - *Resposta:* Se usasse um valor só, qualquer sombrinha ou ruído na luz faria o LED e o tema do jogo ficarem piscando sem parar. Essa folga de 160 pontos entre 620 e 780 se chama **histerese** e deixa a troca estável.
 - **Onde o sistema mostra o estado sem usar Monitor Serial (R5)?**
   - *Resposta:* Nos **LEDs da placa** (azul mostra se o Bluetooth está conectado; vermelho mostra escuro/claro e pisca nas confirmações) e na **tela do aplicativo** (barra no topo com conexão, % de luz, estado do LED, jogo 2D, gráfico e tabela).
 

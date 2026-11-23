@@ -388,7 +388,7 @@ const html = `<!doctype html>
     </tr>
     <tr>
       <td><strong>R2 — Decisão local offline</strong></td>
-      <td>No modo <code>auto</code>, o ESP32 faz média de 8 leituras e histerese (950/1250) a cada 100 ms, sem internet e sem celular.</td>
+      <td>No modo <code>auto</code>, o ESP32 faz média de 8 leituras e histerese (620/780) a cada 100 ms, sem internet e sem celular.</td>
       <td>Basta ligar o ESP32 na energia para funcionar.</td>
     </tr>
     <tr>
@@ -445,7 +445,7 @@ const html = `<!doctype html>
 
 <h3>3.1 Contas rápidas do circuito</h3>
 <ul>
-  <li><strong>Divisor de tensão do LDR (D34):</strong> o LDR vai do <code>3.3V</code> até o pino <code>D34</code>, e o resistor de <code>10 kΩ</code> vai do <code>D34</code> até o <code>GND</code>. Quanto mais luz bate, menor a resistência do LDR e maior a tensão no pino (na bancada: ~1720 na luz da sala). Ao cobrir o sensor, a tensão cai (~490 no ADC), ativando o estado escuro abaixo de <code>950</code>.</li>
+  <li><strong>Divisor de tensão do LDR (D34):</strong> o LDR vai do <code>3.3V</code> até o pino <code>D34</code>, e o resistor de <code>10 kΩ</code> vai do <code>D34</code> até o <code>GND</code>. Quanto mais luz bate, menor a resistência do LDR e maior a tensão no pino (na bancada: ~1001–1737 na luz ambiente). Ao cobrir o sensor, a tensão cai (~151–508 no ADC), ativando o estado escuro abaixo de <code>620</code>.</li>
   <li><strong>Resistor do LED vermelho (D26):</strong> a saída dá <code>3,3 V</code> e o LED vermelho consome cerca de <code>1,9 V</code>. Com <code>220 Ω</code>, a corrente fica em <code>(3,3 - 1,9) / 220 ≈ 6,4 mA</code>, bem abaixo do limite seguro do ESP32 (20 mA).</li>
 </ul>
 
@@ -546,14 +546,14 @@ const html = `<!doctype html>
 
 <h3>4.1 Leitura estável do sensor e controle sem travar o ESP32</h3>
 <p>
-  O código não usa <code>delay()</code> longo para não travar o botão nem o Bluetooth. Ele usa o relógio <code>millis()</code> para fazer tudo em paralelo: lê o LDR a cada 100 ms, guarda a média das últimas 8 leituras e aplica duas faixas (histerese): só entra no escuro abaixo de <code>950</code> e só volta para o claro acima de <code>1250</code>.
+  O código não usa <code>delay()</code> longo para não travar o botão nem o Bluetooth. Ele usa o relógio <code>millis()</code> para fazer tudo em paralelo: lê o LDR a cada 100 ms, guarda a média das últimas 8 leituras e aplica duas faixas (histerese): só entra no escuro abaixo de <code>620</code> e só volta para o claro acima de <code>780</code>.
 </p>
 <pre>void sampleLdrAndApplyLocalRule(bool&amp; stateChanged) {
   ldrSamples[ldrSampleIndex] = readSingleLdr();
   ldrSampleIndex = (ldrSampleIndex + 1) % LDR_AVG_WINDOW;
   // ... calcula média ldrRawAvg ...
-  if (!isDark &amp;&amp; ldrRawAvg &lt; LDR_DARK_ENTER) isDark = true;       // &lt; 950 (~23%)
-  else if (isDark &amp;&amp; ldrRawAvg &gt; LDR_DARK_EXIT) isDark = false; // &gt; 1250 (~31%)
+  if (!isDark &amp;&amp; ldrRawAvg &lt; LDR_DARK_ENTER) isDark = true;       // &lt; 620 (~15%)
+  else if (isDark &amp;&amp; ldrRawAvg &gt; LDR_DARK_EXIT) isDark = false; // &gt; 780 (~19%)
 
   targetLedState = (ledMode == "auto") ? isDark : manualLedState;
 }</pre>
@@ -754,7 +754,7 @@ ${exErr}</pre>
     <tr>
       <td><strong>T3 — Regras e Ataques</strong></td>
       <td>Simulação no <code>MockEsp32Device</code> (histerese, comando falso e replay).</td>
-      <td>Histerese 950/1250 funcionou; retornou <code>AUTH_FAILED</code> e <code>REPLAY_DETECTED</code>.</td>
+      <td>Histerese 620/780 funcionou; retornou <code>AUTH_FAILED</code> e <code>REPLAY_DETECTED</code>.</td>
       <td><strong>Passou</strong></td>
     </tr>
     <tr>
@@ -765,7 +765,7 @@ ${exErr}</pre>
     </tr>
     <tr>
       <td><strong>T5 — Bancada Física (ESP32)</strong></td>
-      <td>Leitura real do LDR na USB (<code>~1707–1737</code> claro / <code>~472–508</code> tampado).</td>
+      <td>Leitura real do LDR na USB (<code>~1001–1737</code> claro / <code>~151–508</code> tampado).</td>
       <td>BLE ativo (<code>DungeonLink-ESP32</code>), LED apaga no claro e acende ao tampar o LDR offline.</td>
       <td><strong>Aprovado</strong></td>
     </tr>
@@ -778,7 +778,7 @@ ${exErr}</pre>
     <strong>Corte de mensagens JSON no Bluetooth (MTU de 23 bytes):</strong> mensagens de ~115 bytes chegam quebradas se o celular usar o limite padrão de 20 bytes por pacote. <em>Correção:</em> pedimos MTU de 256 bytes e também enviamos o texto quebrado em blocos até o <code>\\n</code> final, remontando tudo em <code>LineFrameAssembler</code> no app.
   </li>
   <li>
-    <strong>Calibração e oscilação do LED no limite claro/escuro:</strong> na bancada real, a iluminação da sala marcou ~1720 e o corte inicial (1500/1800) mantinha o LED sempre aceso; além disso, um corte único causaria oscilações com qualquer sombra. <em>Correção:</em> ajustamos a média de 8 leituras com histerese calibrada para o ambiente (entra no escuro abaixo de <code>950</code> e só sai acima de <code>1250</code>).
+    <strong>Calibração e oscilação do LED no limite claro/escuro:</strong> na bancada real, a variação da luz ambiente entre tarde e fim de tarde foi de ~1720 para ~1010, mantendo o LED aceso com os cortes iniciais; além disso, um corte único causaria oscilações com qualquer sombra. <em>Correção:</em> ajustamos a média de 8 leituras com histerese calibrada para o ambiente (entra no escuro abaixo de <code>620</code> e só sai acima de <code>780</code>).
   </li>
   <li>
     <strong>Conflito de pino ADC2 com Bluetooth e atualização do ESP32 4.0.0:</strong> pinos do ADC2 falham com rádio ligado, e a versão 4.0.0 do ESP32 mudou a biblioteca BLE para <code>&lt;BLE.h&gt;</code> e removeu o HMAC antigo da MbedTLS. <em>Correção:</em> ligamos o LDR no pino <code>GPIO 34 (ADC1)</code> e escrevemos o código já na API nova <code>&lt;BLE.h&gt;</code> com HMAC RFC 2104 sobre <code>mbedtls_md</code>.

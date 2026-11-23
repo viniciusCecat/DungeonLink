@@ -96,14 +96,14 @@ export const ControlPanel: React.FC<ControlPanelProps> = ({
         <div className="card sim-card">
           <h3>Bancada Virtual do ESP32 (Simulador Local)</h3>
           <p className="muted">
-            Simula o divisor LDR (GPIO 34) com histerese 950/1250 e o botao fisico (GPIO 27).
+            Simula o divisor LDR (GPIO 34) com histerese 620/780 e o botao fisico (GPIO 27).
           </p>
           <div className="sim-controls">
             <label className="slider-label">
               <span>
                 Luminosidade Simulada: <strong>{simLdrRaw}</strong> ADC (
                 {Math.round((simLdrRaw * 100) / 4095)}%) —{' '}
-                {simLdrRaw < 950 ? 'Escuro' : simLdrRaw > 1250 ? 'Claro' : 'Faixa de histerese'}
+                {simLdrRaw < 620 ? 'Escuro' : simLdrRaw > 780 ? 'Claro' : 'Faixa de histerese'}
               </span>
               <input
                 type="range"
@@ -117,16 +117,16 @@ export const ControlPanel: React.FC<ControlPanelProps> = ({
               <button
                 type="button"
                 className="btn btn-secondary"
-                onClick={() => onSimLdrChange(490)}
+                onClick={() => onSimLdrChange(320)}
               >
-                Simular Escuro (490)
+                Simular Escuro (320)
               </button>
               <button
                 type="button"
                 className="btn btn-secondary"
-                onClick={() => onSimLdrChange(1730)}
+                onClick={() => onSimLdrChange(1150)}
               >
-                Simular Claro (1730)
+                Simular Claro (1150)
               </button>
               <button type="button" className="btn btn-primary" onClick={onSimButtonPress}>
                 Pressionar Botao Fisico

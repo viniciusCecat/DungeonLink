@@ -31,8 +31,8 @@
 // ============================================================
 #define LDR_SAMPLE_INTERVAL_MS   100UL   // Amostragem do sensor a cada 100 ms
 #define LDR_AVG_WINDOW           8       // Janela da media movel
-#define LDR_DARK_ENTER           950     // Entra em estado escuro abaixo de ~23% (ADC 12-bit)
-#define LDR_DARK_EXIT            1250    // Volta ao estado claro acima de ~31% (histerese 300)
+#define LDR_DARK_ENTER           620     // Entra em estado escuro abaixo de ~15% (ADC 12-bit)
+#define LDR_DARK_EXIT            780     // Volta ao estado claro acima de ~19% (histerese 160)
 
 #define BUTTON_DEBOUNCE_MS       50UL    // Debounce do botao tatil
 #define TELEMETRY_INTERVAL_MS    1500UL  // Envio periodico de telemetria BLE

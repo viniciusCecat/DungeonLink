@@ -3,8 +3,8 @@ export const SERVICE_UUID = 'd0a6e001-7c3b-4a2e-9b1f-5e8c4d2a1000';
 export const CHAR_TX_UUID = 'd0a6e002-7c3b-4a2e-9b1f-5e8c4d2a1000';
 export const CHAR_RX_UUID = 'd0a6e003-7c3b-4a2e-9b1f-5e8c4d2a1000';
 
-export const LDR_DARK_ENTER = 950;
-export const LDR_DARK_EXIT = 1250;
+export const LDR_DARK_ENTER = 620;
+export const LDR_DARK_EXIT = 780;
 
 export type LightState = 'bright' | 'dark';
 export type LedMode = 'auto' | 'manual';

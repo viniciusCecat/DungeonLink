@@ -16,6 +16,8 @@ volatile bool bleConnected = false;
 volatile bool shouldRestartAdvertising = false;
 volatile unsigned long disconnectTimestamp = 0;
 volatile uint16_t negotiatedMtu = 23;
+volatile bool pendingInitialDungeonReq = false;
+volatile unsigned long initialSubTimestamp = 0;
 
 portMUX_TYPE rxMux = portMUX_INITIALIZER_UNLOCKED;
 String rxStreamBuffer = "";
@@ -188,7 +190,7 @@ void sendNotifyJson(const String& json) {
     txChr.notify(ptr + offset, chunkLen);
     offset += chunkLen;
     if (offset < totalLen) {
-      delay(6);
+      delay(15);
     }
   }
 }
@@ -414,6 +416,15 @@ void setupBleServer() {
     BLEProperty::Read | BLEProperty::Notify,
     BLEPermission::ReadOpen
   );
+  txChr.onSubscribe([](BLECharacteristic &c, const BLEConnInfo &conn, uint16_t subValue) {
+    (void)c;
+    (void)conn;
+    DL_LOGF("[BLE] Inscricao TX atualizada (sub=%u)\n", subValue);
+    if (subValue > 0) {
+      pendingInitialDungeonReq = true;
+      initialSubTimestamp = millis();
+    }
+  });
   rxChr = svc.createCharacteristic(
     BLEUUID(CHAR_RX_UUID),
     BLEProperty::Write | BLEProperty::WriteNR,
@@ -470,6 +481,7 @@ void setup() {
   delay(200);
 
   pinMode(PIN_BUTTON, INPUT_PULLUP);
+  pinMode(0, INPUT_PULLUP); // Botao BOOT onboard em paralelo com D27
   pinMode(PIN_LED_RED, OUTPUT);
   pinMode(PIN_LED_BLE, OUTPUT);
   digitalWrite(PIN_LED_BLE, LOW);
@@ -501,6 +513,13 @@ void loop() {
     DL_LOGLN("[BLE] Advertising reiniciado");
   }
 
+  // 1b. Handshake inicial: envia dungeon_req logo apos o app assinar Notify
+  if (pendingInitialDungeonReq && bleConnected && (now - initialSubTimestamp >= 250UL)) {
+    pendingInitialDungeonReq = false;
+    DL_LOGLN("[BLE] Enviando dungeon inicial apos inscricao do app");
+    sendSignedStatePacket("dungeon_req");
+  }
+
   // 2. Amostragem do LDR e regra local autonoma (R1/R2)
   bool localStateChanged = false;
   if (now - lastLdrSampleMs >= LDR_SAMPLE_INTERVAL_MS) {
@@ -508,8 +527,8 @@ void loop() {
     sampleLdrAndApplyLocalRule(localStateChanged);
   }
 
-  // 3. Leitura do botao fisico com debounce e borda de descida
-  int btnReading = digitalRead(PIN_BUTTON);
+  // 3. Leitura do botao fisico (D27 ou BOOT onboard GPIO 0) com debounce
+  int btnReading = (digitalRead(PIN_BUTTON) == LOW || digitalRead(0) == LOW) ? LOW : HIGH;
   if (btnReading != lastButtonReading) {
     lastButtonDebounceMs = now;
     lastButtonReading = btnReading;
@@ -553,9 +572,10 @@ void loop() {
   static unsigned long lastDiagMs = 0;
   if (now - lastDiagMs >= 1500UL) {
     lastDiagMs = now;
-    DL_LOGF("[DIAG] LDR_raw=%d (%d%%) | dark=%d | LED_D26=%d | BTN_D27=%s\n",
+    DL_LOGF("[DIAG] LDR_raw=%d (%d%%) | dark=%d | LED_D26=%d | BTN_D27=%s | BLE=%d(sub=%d)\n",
             ldrRawAvg, ldrPct, isDark ? 1 : 0, targetLedState ? 1 : 0,
-            stableButtonState == LOW ? "PRESSED" : "RELEASED");
+            stableButtonState == LOW ? "PRESSED" : "RELEASED",
+            bleConnected ? 1 : 0, txChr ? static_cast<int>(txChr.getSubscribedCount()) : 0);
   }
 
   delay(10);

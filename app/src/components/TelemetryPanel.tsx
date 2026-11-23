@@ -163,8 +163,8 @@ export const TelemetryPanel: React.FC<TelemetryPanelProps> = ({ history, latest 
             />
 
             <text x="6" y={padTop + 9} fill="#8b94ad" fontSize="10">4095</text>
-            <text x="6" y={exitY + 3} fill="#fab005" fontSize="9">1250</text>
-            <text x="6" y={enterY + 3} fill="#ff8787" fontSize="9">950</text>
+            <text x="6" y={exitY + 3} fill="#fab005" fontSize="9">780</text>
+            <text x="6" y={enterY + 3} fill="#ff8787" fontSize="9">620</text>
             <text x="20" y={padTop + plotH} fill="#8b94ad" fontSize="10">0</text>
 
             {chartItems.length >= 2 && (

@@ -29,7 +29,7 @@ export function diagramFourLayersSvg() {
   <text x="297" y="44" text-anchor="middle" fill="#ffffff" font-size="12" font-weight="700">2. PROCESSAMENTO</text>
   <text x="222" y="74" fill="#0f172a" font-size="11" font-weight="700">No ESP32 (local):</text>
   <text x="222" y="92" fill="#334155" font-size="10.5">• Média de 8 leituras</text>
-  <text x="222" y="108" fill="#334155" font-size="10.5">• Histerese 950 / 1250</text>
+  <text x="222" y="108" fill="#334155" font-size="10.5">• Histerese 620 / 780</text>
   <text x="222" y="124" fill="#334155" font-size="10.5">• Regra offline R1/R2 (Auto)</text>
   <text x="222" y="140" fill="#334155" font-size="10.5">• Sorteio da fase (1 a 3)</text>
   <text x="222" y="156" fill="#334155" font-size="10.5">• Anti-replay e limite RX</text>
@@ -76,7 +76,7 @@ export function diagramFourLayersSvg() {
   <!-- Destaque Offline R2 -->
   <rect x="18" y="238" width="366" height="58" rx="8" fill="#f0fdfa" stroke="#0f766e" stroke-width="1.5" stroke-dasharray="5 3"/>
   <text x="32" y="259" fill="#0f766e" font-size="11" font-weight="700">DECISÃO LOCAL OFFLINE (R1 e R2 — Sem Internet e Sem Celular)</text>
-  <text x="32" y="278" fill="#134e4a" font-size="10.2">LDR &lt; 950 (escuro) → ESP32 acende o LED vermelho (D26); apaga acima de 1250.</text>
+  <text x="32" y="278" fill="#134e4a" font-size="10.2">LDR &lt; 620 (escuro) → ESP32 acende o LED vermelho (D26); apaga acima de 780.</text>
 
   <!-- Legenda -->
   <rect x="408" y="238" width="354" height="58" rx="8" fill="#f1f5f9" stroke="#64748b" stroke-width="1.2"/>
@@ -212,7 +212,7 @@ export function diagramSequenceSvg() {
   <line x1="672" y1="48" x2="672" y2="302" stroke="#94a3b8" stroke-dasharray="4 4"/>
 
   <rect x="30" y="58" width="420" height="32" rx="5" fill="#f0fdfa" stroke="#0f766e" stroke-dasharray="4 2"/>
-  <text x="240" y="78" text-anchor="middle" fill="#0f766e" font-size="10.5" font-weight="700">1. Offline (R1/R2): LDR &lt; 950 → ESP32 acende o LED (D26) sozinho</text>
+  <text x="240" y="78" text-anchor="middle" fill="#0f766e" font-size="10.5" font-weight="700">1. Offline (R1/R2): LDR &lt; 620 → ESP32 acende o LED (D26) sozinho</text>
 
   <line x1="672" y1="108" x2="394" y2="108" stroke="#1e293b" stroke-width="1.6" marker-end="url(#seqArrow)"/>
   <text x="532" y="102" text-anchor="middle" fill="#1e293b" font-size="10">2. Conecta por BLE e assina notificações</text>
