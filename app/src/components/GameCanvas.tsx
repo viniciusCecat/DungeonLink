@@ -1,6 +1,6 @@
-import React, { useEffect, useRef } from 'react';
+import React, { useEffect, useRef, useState } from 'react';
 import { CANVAS_HEIGHT, CANVAS_WIDTH } from '../game/dungeons';
-import type { DungeonGameEngine, GameSnapshot, InputState } from '../game/engine';
+import type { DungeonGameEngine, GameSnapshot } from '../game/engine';
 import type { LightState } from '../ble/protocol';
 
 interface GameCanvasProps {
@@ -21,32 +21,36 @@ export const GameCanvas: React.FC<GameCanvasProps> = ({
   onRetryDungeon,
 }) => {
   const canvasRef = useRef<HTMLCanvasElement | null>(null);
-  const inputRef = useRef<InputState>({
-    up: false,
-    down: false,
-    left: false,
-    right: false,
-    attackPressed: false,
-  });
+  const stickZoneRef = useRef<HTMLDivElement | null>(null);
+  const stickPointerId = useRef<number | null>(null);
+
+  const keysRef = useRef({ up: false, down: false, left: false, right: false });
+  const joyRef = useRef({ x: 0, y: 0 });
+  const pendingActionRef = useRef({ attack: false, dash: false });
+  const [knobOffset, setKnobOffset] = useState({ x: 0, y: 0 });
 
   useEffect(() => {
     const onKeyDown = (e: KeyboardEvent) => {
       const k = e.key.toLowerCase();
-      if (k === 'w' || e.key === 'ArrowUp') inputRef.current.up = true;
-      if (k === 's' || e.key === 'ArrowDown') inputRef.current.down = true;
-      if (k === 'a' || e.key === 'ArrowLeft') inputRef.current.left = true;
-      if (k === 'd' || e.key === 'ArrowRight') inputRef.current.right = true;
+      if (k === 'w' || e.key === 'ArrowUp') keysRef.current.up = true;
+      if (k === 's' || e.key === 'ArrowDown') keysRef.current.down = true;
+      if (k === 'a' || e.key === 'ArrowLeft') keysRef.current.left = true;
+      if (k === 'd' || e.key === 'ArrowRight') keysRef.current.right = true;
       if (k === ' ' || k === 'enter' || k === 'j') {
         e.preventDefault();
-        inputRef.current.attackPressed = true;
+        pendingActionRef.current.attack = true;
+      }
+      if (k === 'shift' || k === 'k') {
+        e.preventDefault();
+        pendingActionRef.current.dash = true;
       }
     };
     const onKeyUp = (e: KeyboardEvent) => {
       const k = e.key.toLowerCase();
-      if (k === 'w' || e.key === 'ArrowUp') inputRef.current.up = false;
-      if (k === 's' || e.key === 'ArrowDown') inputRef.current.down = false;
-      if (k === 'a' || e.key === 'ArrowLeft') inputRef.current.left = false;
-      if (k === 'd' || e.key === 'ArrowRight') inputRef.current.right = false;
+      if (k === 'w' || e.key === 'ArrowUp') keysRef.current.up = false;
+      if (k === 's' || e.key === 'ArrowDown') keysRef.current.down = false;
+      if (k === 'a' || e.key === 'ArrowLeft') keysRef.current.left = false;
+      if (k === 'd' || e.key === 'ArrowRight') keysRef.current.right = false;
     };
     window.addEventListener('keydown', onKeyDown);
     window.addEventListener('keyup', onKeyUp);
@@ -64,8 +68,19 @@ export const GameCanvas: React.FC<GameCanvasProps> = ({
       const dt = (ts - lastTs) / 1000;
       lastTs = ts;
 
-      engine.update(dt, inputRef.current);
-      inputRef.current.attackPressed = false;
+      const kx = (keysRef.current.right ? 1 : 0) - (keysRef.current.left ? 1 : 0);
+      const ky = (keysRef.current.down ? 1 : 0) - (keysRef.current.up ? 1 : 0);
+      const moveX = Math.abs(joyRef.current.x) > 0.05 ? joyRef.current.x : kx;
+      const moveY = Math.abs(joyRef.current.y) > 0.05 ? joyRef.current.y : ky;
+
+      engine.update(dt, {
+        moveX,
+        moveY,
+        attackPressed: pendingActionRef.current.attack,
+        dashPressed: pendingActionRef.current.dash,
+      });
+      pendingActionRef.current.attack = false;
+      pendingActionRef.current.dash = false;
 
       const canvas = canvasRef.current;
       if (canvas) {
@@ -82,12 +97,30 @@ export const GameCanvas: React.FC<GameCanvasProps> = ({
     return () => cancelAnimationFrame(rafId);
   }, [engine]);
 
-  const setDir = (dir: keyof Omit<InputState, 'attackPressed'>, pressed: boolean) => {
-    inputRef.current[dir] = pressed;
+  const updateJoystick = (clientX: number, clientY: number) => {
+    const zone = stickZoneRef.current;
+    if (!zone) return;
+    const rect = zone.getBoundingClientRect();
+    const cx = rect.left + rect.width / 2;
+    const cy = rect.top + rect.height / 2;
+    const maxR = rect.width * 0.36;
+    let dx = clientX - cx;
+    let dy = clientY - cy;
+    const dist = Math.hypot(dx, dy);
+    if (dist > maxR && dist > 0) {
+      dx = (dx / dist) * maxR;
+      dy = (dy / dist) * maxR;
+    }
+    joyRef.current.x = dx / maxR;
+    joyRef.current.y = dy / maxR;
+    setKnobOffset({ x: dx, y: dy });
   };
 
-  const triggerAttack = () => {
-    inputRef.current.attackPressed = true;
+  const resetJoystick = () => {
+    stickPointerId.current = null;
+    joyRef.current.x = 0;
+    joyRef.current.y = 0;
+    setKnobOffset({ x: 0, y: 0 });
   };
 
   return (
@@ -99,13 +132,13 @@ export const GameCanvas: React.FC<GameCanvasProps> = ({
           <strong className="hud-title">{snapshot.dungeonName}</strong>
         </div>
         <div className="hud-block">
-          <span className="hud-label">SALA / CENARIO</span>
+          <span className="hud-label">SALA / CENÁRIO</span>
           <strong>
             Sala {snapshot.room}/2 · {light === 'dark' ? 'Modo Sombrio' : 'Modo Claro'}
           </strong>
         </div>
         <div className="hud-block">
-          <span className="hud-label">VIDA HEROI</span>
+          <span className="hud-label">VIDA HERÓI</span>
           <span className="hearts" aria-label={`Vida ${snapshot.playerHp} de ${snapshot.playerMaxHp}`}>
             {Array.from({ length: snapshot.playerMaxHp }, (_, idx) => (
               <span key={idx} className={idx < snapshot.playerHp ? 'heart-on' : 'heart-off'}>
@@ -124,7 +157,7 @@ export const GameCanvas: React.FC<GameCanvasProps> = ({
         )}
       </div>
 
-      {/* Canvas Pixel Art */}
+      {/* Canvas Pixel Art 60fps */}
       <div className="canvas-frame">
         <canvas
           ref={canvasRef}
@@ -137,14 +170,14 @@ export const GameCanvas: React.FC<GameCanvasProps> = ({
           <div className="canvas-overlay victory">
             <h3>PORTAL ALCANÇADO!</h3>
             <p>
-              {snapshot.dungeonName} concluida em {snapshot.elapsedSec}s.
+              {snapshot.dungeonName} concluída em {snapshot.elapsedSec}s.
               {connected
-                ? ' Confirmacao enviada ao ESP32 (LED piscando).'
-                : ' Conecte o ESP32 para sincronizar o LED fisico.'}
+                ? ' Confirmação enviada ao ESP32 (LED piscando).'
+                : ' Conecte o ESP32 para sincronizar o LED físico.'}
             </p>
             <div className="overlay-actions">
               <button type="button" className="btn btn-primary" onClick={onRequestNewDungeon}>
-                Proxima Dungeon
+                Próxima Dungeon
               </button>
               <button type="button" className="btn btn-secondary" onClick={onRetryDungeon}>
                 Jogar Novamente
@@ -155,8 +188,8 @@ export const GameCanvas: React.FC<GameCanvasProps> = ({
 
         {snapshot.status === 'defeat' && (
           <div className="canvas-overlay defeat">
-            <h3>HEROI DERROTADO</h3>
-            <p>O inimigo guardiao venceu esta tentativa.</p>
+            <h3>HERÓI DERROTADO</h3>
+            <p>O guardião da masmorra venceu esta tentativa.</p>
             <div className="overlay-actions">
               <button type="button" className="btn btn-primary" onClick={onRetryDungeon}>
                 Tentar Novamente
@@ -171,71 +204,64 @@ export const GameCanvas: React.FC<GameCanvasProps> = ({
 
       <div className="hint-strip">{snapshot.hintText}</div>
 
-      {/* Controles Touch + Acoes Rapidas */}
+      {/* Controles fluidos estilo Soul Knight: Analogico 360° + Atacar + Dash */}
       <div className="controls-deck">
-        <div className="dpad" aria-label="Direcional">
-          <div />
-          <button
-            type="button"
-            className="dpad-btn"
-            onPointerDown={() => setDir('up', true)}
-            onPointerUp={() => setDir('up', false)}
-            onPointerLeave={() => setDir('up', false)}
-            onPointerCancel={() => setDir('up', false)}
-          >
-            ▲
-          </button>
-          <div />
-          <button
-            type="button"
-            className="dpad-btn"
-            onPointerDown={() => setDir('left', true)}
-            onPointerUp={() => setDir('left', false)}
-            onPointerLeave={() => setDir('left', false)}
-            onPointerCancel={() => setDir('left', false)}
-          >
-            ◀
-          </button>
-          <div className="dpad-center" />
-          <button
-            type="button"
-            className="dpad-btn"
-            onPointerDown={() => setDir('right', true)}
-            onPointerUp={() => setDir('right', false)}
-            onPointerLeave={() => setDir('right', false)}
-            onPointerCancel={() => setDir('right', false)}
-          >
-            ▶
-          </button>
-          <div />
-          <button
-            type="button"
-            className="dpad-btn"
-            onPointerDown={() => setDir('down', true)}
-            onPointerUp={() => setDir('down', false)}
-            onPointerLeave={() => setDir('down', false)}
-            onPointerCancel={() => setDir('down', false)}
-          >
-            ▼
-          </button>
-          <div />
+        <div
+          ref={stickZoneRef}
+          className="joystick-base"
+          aria-label="Analógico virtual 360 graus"
+          onPointerDown={(e) => {
+            e.preventDefault();
+            stickPointerId.current = e.pointerId;
+            e.currentTarget.setPointerCapture(e.pointerId);
+            updateJoystick(e.clientX, e.clientY);
+          }}
+          onPointerMove={(e) => {
+            if (stickPointerId.current !== e.pointerId) return;
+            e.preventDefault();
+            updateJoystick(e.clientX, e.clientY);
+          }}
+          onPointerUp={(e) => {
+            if (stickPointerId.current === e.pointerId) resetJoystick();
+          }}
+          onPointerCancel={resetJoystick}
+        >
+          <div className="joystick-ring" />
+          <div
+            className="joystick-knob"
+            style={{ transform: `translate(${knobOffset.x}px, ${knobOffset.y}px)` }}
+          />
         </div>
 
         <div className="action-cluster">
-          <button
-            type="button"
-            className="attack-btn"
-            onPointerDown={(e) => {
-              e.preventDefault();
-              triggerAttack();
-            }}
-          >
-            ⚔ ATACAR
-          </button>
-          <button type="button" className="btn btn-secondary" onClick={onRequestNewDungeon}>
-            Nova Dungeon
-          </button>
-          <span className="kbd-tip">Teclado: WASD / Setas + Espaco</span>
+          <div className="combat-btns">
+            <button
+              type="button"
+              className="dash-btn"
+              onPointerDown={(e) => {
+                e.preventDefault();
+                pendingActionRef.current.dash = true;
+              }}
+            >
+              ⚡ DASH
+            </button>
+            <button
+              type="button"
+              className="attack-btn"
+              onPointerDown={(e) => {
+                e.preventDefault();
+                pendingActionRef.current.attack = true;
+              }}
+            >
+              ⚔ ATACAR
+            </button>
+          </div>
+          <div className="sub-actions">
+            <button type="button" className="btn btn-secondary" onClick={onRequestNewDungeon}>
+              Nova Dungeon
+            </button>
+            <span className="kbd-tip">WASD + Espaço (Atacar) + Shift (Dash)</span>
+          </div>
         </div>
       </div>
     </section>
