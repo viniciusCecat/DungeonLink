@@ -264,6 +264,12 @@ export const App: React.FC = () => {
         </div>
       )}
 
+      {errorMsg && activeTab !== 'control' && (
+        <div className="alert-box">
+          <strong>BLE:</strong> {errorMsg}
+        </div>
+      )}
+
       {toastMsg && <div className="toast-banner">{toastMsg}</div>}
 
       <nav className="tab-bar" role="tablist">

@@ -1,6 +1,7 @@
 import { Capacitor } from '@capacitor/core';
 import {
   BleClient,
+  ScanMode,
   dataViewToText,
   textToDataView,
 } from '@capacitor-community/bluetooth-le';
@@ -74,10 +75,18 @@ export class DungeonBleService {
     this.mode = 'connecting';
     this.callbacks.onStatusChange('connecting', 'Buscando ESP32...');
 
+    let selectedDeviceId: string | null = null;
     try {
       await BleClient.initialize({ androidNeverForLocation: true });
 
       if (Capacitor.isNativePlatform()) {
+        await BleClient.setDisplayStrings({
+          scanning: 'Buscando DungeonLink-ESP32...',
+          cancel: 'Cancelar',
+          availableDevices: 'Selecione o ESP32',
+          noDeviceFound: 'Nenhum ESP32 encontrado (verifique Bluetooth/GPS)',
+        }).catch(() => {});
+
         const enabled = await BleClient.isEnabled();
         if (!enabled) {
           await BleClient.requestEnable();
@@ -85,24 +94,53 @@ export class DungeonBleService {
       }
 
       const device = await BleClient.requestDevice({
-        services: [SERVICE_UUID],
+        namePrefix: 'DungeonLink',
         optionalServices: [SERVICE_UUID],
+        scanMode: ScanMode.SCAN_MODE_LOW_LATENCY,
       });
 
+      selectedDeviceId = device.deviceId;
       this.connectedDeviceId = device.deviceId;
       this.deviceLabel = device.name || BLE_DEVICE_NAME;
       this.assembler.reset();
       this.rxSeq = 0;
 
-      await BleClient.connect(
-        device.deviceId,
-        () => {
-          this.handleUnexpectedDisconnect();
-        },
-        { timeout: 12000 },
-      );
-
+      // Limpa eventual conexao zumbi no cache GATT do Android antes de conectar
       if (Capacitor.isNativePlatform()) {
+        await BleClient.disconnect(device.deviceId).catch(() => {});
+      }
+
+      this.callbacks.onStatusChange('connecting', `Conectando a ${this.deviceLabel}...`);
+
+      let connectedOk = false;
+      let lastErr: unknown = null;
+      for (let attempt = 1; attempt <= 2; attempt++) {
+        try {
+          await BleClient.connect(
+            device.deviceId,
+            () => {
+              this.handleUnexpectedDisconnect();
+            },
+            { timeout: 12000 },
+          );
+          connectedOk = true;
+          break;
+        } catch (e) {
+          lastErr = e;
+          await BleClient.disconnect(device.deviceId).catch(() => {});
+          if (attempt < 2) {
+            await new Promise((r) => setTimeout(r, 450));
+          }
+        }
+      }
+
+      if (!connectedOk) {
+        throw lastErr ?? new Error('Falha ao conectar no GATT do ESP32.');
+      }
+
+      // Pequeno intervalo para o Android estabilizar a descoberta de servicos GATT
+      if (Capacitor.isNativePlatform()) {
+        await new Promise((r) => setTimeout(r, 250));
         try {
           this.mtu = await BleClient.getMtu(device.deviceId);
         } catch {
@@ -123,11 +161,24 @@ export class DungeonBleService {
       this.mode = 'ble';
       this.callbacks.onStatusChange('ble', `${this.deviceLabel} (MTU ${this.mtu})`);
     } catch (err) {
-      const msg = err instanceof Error ? err.message : String(err);
+      if (selectedDeviceId && Capacitor.isNativePlatform()) {
+        await BleClient.disconnect(selectedDeviceId).catch(() => {});
+      }
+      const rawMsg = err instanceof Error ? err.message : String(err);
+      let friendly = rawMsg;
+      if (/permission/i.test(rawMsg)) {
+        friendly = 'Permissão de Bluetooth negada. Ative "Dispositivos por perto" nas configs do app.';
+      } else if (/location/i.test(rawMsg)) {
+        friendly = 'Ative a Localização (GPS) do celular para buscar dispositivos BLE.';
+      } else if (/cancel/i.test(rawMsg)) {
+        friendly = 'Busca cancelada pelo usuário.';
+      } else if (/no device/i.test(rawMsg)) {
+        friendly = 'ESP32 não encontrado. Veja se o LED azul do ESP32 está piscando e se o Bluetooth está ligado.';
+      }
       this.connectedDeviceId = null;
       this.mode = 'disconnected';
       this.deviceLabel = 'Desconectado';
-      this.callbacks.onStatusChange('disconnected', this.deviceLabel, msg);
+      this.callbacks.onStatusChange('disconnected', this.deviceLabel, friendly);
     }
   }
 
