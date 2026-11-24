@@ -110,17 +110,17 @@ export function diagramSchematicSvg() {
   <text x="298" y="160" fill="#e2e8f0" font-size="10.5" font-weight="600">3V3</text>
 
   <rect x="268" y="182" width="24" height="16" rx="2" fill="#38bdf8"/>
-  <text x="298" y="194" fill="#e2e8f0" font-size="10.5" font-weight="600">GPIO 34 (D34 / ADC1)</text>
+  <text x="298" y="194" fill="#e2e8f0" font-size="10.2" font-weight="600">D34 (LDR)</text>
 
   <rect x="268" y="236" width="24" height="16" rx="2" fill="#64748b"/>
-  <text x="298" y="248" fill="#e2e8f0" font-size="10.5" font-weight="600">GND</text>
+  <text x="298" y="248" fill="#e2e8f0" font-size="10.2" font-weight="600">GND</text>
 
   <!-- Pinos direita -->
   <rect x="488" y="176" width="24" height="16" rx="2" fill="#f87171"/>
-  <text x="482" y="188" text-anchor="end" fill="#e2e8f0" font-size="10.5" font-weight="600">GPIO 26 (D26 / LED)</text>
+  <text x="482" y="188" text-anchor="end" fill="#e2e8f0" font-size="10.2" font-weight="600">D26 (LED)</text>
 
   <rect x="488" y="236" width="24" height="16" rx="2" fill="#60a5fa"/>
-  <text x="482" y="248" text-anchor="end" fill="#e2e8f0" font-size="10.5" font-weight="600">GPIO 2 (LED Azul BLE)</text>
+  <text x="482" y="248" text-anchor="end" fill="#e2e8f0" font-size="10.2" font-weight="600">D2 (LED BLE)</text>
 
   <!-- USB -->
   <rect x="355" y="276" width="70" height="22" rx="3" fill="#cbd5e1" stroke="#475569"/>
