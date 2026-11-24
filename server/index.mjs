@@ -123,18 +123,28 @@ function attachWsClient(socket, onMessage, onClose) {
     }
   });
 
-  socket.on('close', () => {
+  const pingTimer = setInterval(() => {
+    if (closed || socket.destroyed) {
+      clearInterval(pingTimer);
+      return;
+    }
+    try {
+      socket.write(Buffer.from([0x89, 0x00])); // Ping keepalive (evita timeout no Tailscale Funnel)
+    } catch {
+      clearInterval(pingTimer);
+    }
+  }, 25000);
+
+  const cleanup = () => {
+    clearInterval(pingTimer);
     if (!closed) {
       closed = true;
       onClose();
     }
-  });
-  socket.on('error', () => {
-    if (!closed) {
-      closed = true;
-      onClose();
-    }
-  });
+  };
+
+  socket.on('close', cleanup);
+  socket.on('error', cleanup);
 
   return client;
 }
