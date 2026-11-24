@@ -27,11 +27,9 @@ DungeonLink/
 ├── app/                          # App Android em React + Capacitor 6
 ├── docs/
 │   ├── fotos/                    # Prints do app e fotos da montagem física
-│   ├── relatorio/                # Script que gera o relatório PDF (8–15 págs)
-│   ├── slides/                   # Script que gera os slides Pitch (.pptx e .pdf)
-│   ├── montagem-hardware.md      # Passo a passo simples da protoboard
-│   ├── roteiro-video.md          # Roteiro de 4 min para o vídeo
-│   └── guia-defesa-individual.md # Perguntas e respostas da apresentação
+│   ├── relatorio/                # Relatório técnico em PDF e gerador
+│   ├── slides/                   # Slides de Pitch (.pptx e .pdf)
+│   └── montagem-hardware.md      # Passo a passo da montagem na protoboard
 └── .gitignore                    # Bloqueia senhas/chaves e builds pesados
 ```
 
