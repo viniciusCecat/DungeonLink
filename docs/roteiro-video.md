@@ -18,7 +18,7 @@
 
 ### 0:00 – 0:30 | Apresentação rápida
 - Diga o nome do grupo (**Vinicius Cecatto e Leonardo Scheffer Nunes**) e o que o projeto faz: um jogo 2D no celular controlado por sensores reais via Bluetooth.
-- Mostre na câmera as peças na protoboard: **ESP32**, **sensor LDR** (`D34`), **botão** (`D27`), **LED vermelho** (`D26`) e o **LED azul da placa** piscando esperando conexão.
+- Mostre na câmera as peças na protoboard: **ESP32**, **sensor LDR** (`D34`), **LED vermelho** (`D26`) e o **LED azul da placa** piscando esperando conexão.
 
 ### 0:30 – 1:10 | Teste sem celular e sem internet (R1 e R2)
 - Mostre que o app ainda está **Desconectado** e não há internet envolvida.

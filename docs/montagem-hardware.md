@@ -9,7 +9,6 @@ Faça toda a montagem na protoboard **com o cabo USB desconectado**.
 - 1 ESP32 DevKit V1 (30 ou 38 pinos)
 - 1 sensor de luz **LDR** (GL5528)
 - 1 resistor de **10 kΩ** (faixas: **marrom, preto, laranja** ou **marrom, preto, preto, vermelho**)
-- 1 botão tátil 6×6 mm
 - 1 **LED vermelho** de 5 mm
 - 1 resistor de **220 Ω** (faixas: **vermelho, vermelho, marrom** ou **vermelho, vermelho, preto, preto**)
 - Protoboard, jumpers e cabo USB de dados
@@ -28,25 +27,19 @@ Faça toda a montagem na protoboard **com o cabo USB desconectado**.
 2. Ligue o **resistor de 10 kΩ** saindo dessa **mesma Fileira A** até o trilho **`-` (GND)**.
 3. Puxe um jumper dessa **mesma Fileira A** até o pino **`D34`** (ou `34`) do ESP32.
 
-### Passo 3 — Botão
-1. Encaixe o botão atravessando o vão do meio da protoboard.
-2. Ligue um pino do botão no **`D27`** (ou `27`) do ESP32.
-3. Ligue o pino da **diagonal oposta** no trilho **`-` (GND)**. *(Não precisa resistor.)*
-
-### Passo 4 — LED vermelho (+ resistor de 220 Ω)
+### Passo 3 — LED vermelho (+ resistor de 220 Ω)
 1. Puxe um jumper do pino **`D26`** (ou `26`) até uma fileira livre (*Fileira B*).
 2. Ligue o **resistor de 220 Ω** da *Fileira B* para outra fileira livre (*Fileira C*).
 3. Encaixe a **perna longa (`+`)** do LED vermelho na *Fileira C*.
 4. Encaixe a **perna curta / lado reto (`-`)** do LED no trilho **`-` (GND)**.
 
-### Resumo dos 5 pinos no ESP32
+### Resumo dos 4 pinos no ESP32
 - `3V3` → trilho `+`
 - `GND` → trilho `-`
 - `D34` → ponto entre o LDR e o resistor 10 kΩ
-- `D27` → botão (outro lado do botão vai no `GND`)
 - `D26` → resistor 220 Ω → perna longa do LED → perna curta no `GND`
 
-*(O LED azul que já vem soldado na placa no pino `D2` pisca esperando Bluetooth e fica aceso fixo quando o celular conecta.)*
+*(O botão externo foi removido para simplificar a protoboard — o botão nativo **`BOOT`** da placa ou o botão de mapa do app já trocam de fase. O LED azul da placa no pino `D2` pisca esperando Bluetooth e fica aceso fixo quando o celular conecta.)*
 
 ---
 

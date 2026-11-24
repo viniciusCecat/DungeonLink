@@ -10,12 +10,12 @@ Quando a luz da sala muda, o jogo muda de tema na hora e o LED físico responde 
 
 ## Como o projeto funciona (4 camadas de IoT)
 
-1. **Percepção:** sensor de luz **LDR** (`D34`), **botão tátil** (`D27`), **LED vermelho** (`D26`) e **LED azul da placa** (`D2`).
-2. **Rede:** conexão **Bluetooth Low Energy (BLE)** direto entre ESP32 e celular, trocando mensagens JSON assinadas.
+1. **Percepção:** sensor de luz **LDR** (`D34`), **LED vermelho** (`D26`), botão nativo **`BOOT`** da placa (`GPIO 0`) e **LED azul da placa** (`D2`).
+2. **Rede:** conexão **Bluetooth Low Energy (BLE)** direto entre ESP32 e celular, trocando mensagens JSON assinadas, mais relay WebSocket opcional para partidas online.
 3. **Processamento:**
    - **No ESP32:** lê a luz a cada 100 ms, faz média de 8 leituras, usa histerese (`< 620` escuro / `> 780` claro) para o LED não ficar piscando e acende o LED vermelho no escuro **sem precisar de internet ou celular**. Também confere a assinatura de segurança de cada comando recebido.
-   - **No celular:** confere a assinatura dos dados recebidos, roda o jogo 2D e guarda o histórico.
-4. **Aplicação:** app Android com 3 fases (2 salas, inimigo e portal), mudança ao vivo entre claro/escuro, gráfico de histórico e painel de controle/segurança.
+   - **No celular:** confere a assinatura dos dados recebidos, roda o jogo 2D em tela cheia horizontal e guarda o histórico.
+4. **Aplicação:** app Android com 3 masmorras (3 salas cada, inimigos intermediários, chefe e portal), mochila com 7 armas / 5 armaduras / 3 relíquias, modo online **CO-OP e X1**, mudança ao vivo entre claro/escuro e menu **Opções** com gráfico de telemetria e painel de segurança.
 
 ---
 
