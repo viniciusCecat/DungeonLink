@@ -2,14 +2,22 @@ import React, { useEffect, useRef, useState } from 'react';
 import { CANVAS_HEIGHT, CANVAS_WIDTH } from '../game/dungeons';
 import type { DungeonGameEngine, GameSnapshot } from '../game/engine';
 import { ARMORS, ARMOR_LIST, WEAPONS, WEAPON_LIST } from '../game/items';
+import type { ConnectionMode } from '../ble/bleService';
 import type { LightState } from '../ble/protocol';
 
 interface GameCanvasProps {
   engine: DungeonGameEngine;
   snapshot: GameSnapshot;
   light: LightState;
+  ldrPct: number;
+  ledState: 0 | 1;
+  connectionMode: ConnectionMode;
   connected: boolean;
-  hwJoyRef: React.MutableRefObject<{ x: number; y: number; active: boolean }>;
+  errorMsg: string;
+  toastMsg: string;
+  optionsOpen: boolean;
+  onConnectBle: () => void;
+  onOpenOptions: () => void;
   onRequestNewDungeon: () => void;
   onRetryDungeon: () => void;
 }
@@ -18,8 +26,15 @@ export const GameCanvas: React.FC<GameCanvasProps> = ({
   engine,
   snapshot,
   light,
+  ldrPct,
+  ledState,
+  connectionMode,
   connected,
-  hwJoyRef,
+  errorMsg,
+  toastMsg,
+  optionsOpen,
+  onConnectBle,
+  onOpenOptions,
   onRequestNewDungeon,
   onRetryDungeon,
 }) => {
@@ -81,23 +96,11 @@ export const GameCanvas: React.FC<GameCanvasProps> = ({
       const dt = (ts - lastTs) / 1000;
       lastTs = ts;
 
-      if (!inventoryOpen) {
+      if (!inventoryOpen && !optionsOpen) {
         const kx = (keysRef.current.right ? 1 : 0) - (keysRef.current.left ? 1 : 0);
         const ky = (keysRef.current.down ? 1 : 0) - (keysRef.current.up ? 1 : 0);
-        const hwx = hwJoyRef.current.active ? hwJoyRef.current.x : 0;
-        const hwy = hwJoyRef.current.active ? hwJoyRef.current.y : 0;
-        const moveX =
-          Math.abs(joyRef.current.x) > 0.05
-            ? joyRef.current.x
-            : Math.abs(hwx) > 0.05
-              ? hwx
-              : kx;
-        const moveY =
-          Math.abs(joyRef.current.y) > 0.05
-            ? joyRef.current.y
-            : Math.abs(hwy) > 0.05
-              ? hwy
-              : ky;
+        const moveX = Math.abs(joyRef.current.x) > 0.05 ? joyRef.current.x : kx;
+        const moveY = Math.abs(joyRef.current.y) > 0.05 ? joyRef.current.y : ky;
 
         engine.update(dt, {
           moveX,
@@ -122,7 +125,7 @@ export const GameCanvas: React.FC<GameCanvasProps> = ({
 
     rafId = requestAnimationFrame(frame);
     return () => cancelAnimationFrame(rafId);
-  }, [engine, inventoryOpen]);
+  }, [engine, inventoryOpen, optionsOpen]);
 
   const updateJoystick = (clientX: number, clientY: number) => {
     const zone = stickZoneRef.current;
@@ -155,17 +158,19 @@ export const GameCanvas: React.FC<GameCanvasProps> = ({
   const activeArmor = ARMORS[inv.equippedArmor];
 
   return (
-    <section className="game-layout">
-      {/* Barra de status da aventura (Vida, Escudo, Equipamento e Ouro) */}
-      <div className="dungeon-hud">
-        <div className="hud-block">
-          <span className="hud-label">DUNGEON #{snapshot.dungeonId} · SALA {snapshot.room}/2</span>
-          <strong className="hud-title">
-            {snapshot.dungeonName} · {light === 'dark' ? 'Escuro' : 'Claro'}
-          </strong>
-        </div>
-        <div className="hud-block">
-          <span className="hud-label">VIDA &amp; ESCUDO</span>
+    <section className="fs-stage">
+      {/* Canvas Pixel Art 60fps em Tela Cheia Horizontal */}
+      <canvas
+        ref={canvasRef}
+        width={CANVAS_WIDTH}
+        height={CANVAS_HEIGHT}
+        className="fs-canvas"
+      />
+
+      {/* HUD Flutuante Superior (estilo Soul Knight) */}
+      <div className="fs-hud-top">
+        {/* Topo Esquerdo: Vida, Escudo, Arma e Ouro */}
+        <div className="hud-pill hud-vitals">
           <div className="vitals-row">
             <span className="hearts" aria-label={`Vida ${snapshot.playerHp} de ${snapshot.playerMaxHp}`}>
               {Array.from({ length: snapshot.playerMaxHp }, (_, idx) => (
@@ -182,75 +187,71 @@ export const GameCanvas: React.FC<GameCanvasProps> = ({
               ))}
             </span>
           </div>
+          <div className="hud-subline">
+            <span style={{ color: activeWeapon.color, fontWeight: 700 }}>{activeWeapon.name}</span>
+            <span>· 🪙 {inv.gold}</span>
+          </div>
         </div>
-        <div className="hud-block">
-          <span className="hud-label">EQUIPAMENTO &amp; OURO</span>
-          <strong className="equip-line">
-            <span style={{ color: activeWeapon.color }}>{activeWeapon.name}</span> · 🪙 {inv.gold}
+
+        {/* Topo Centro: Nome da Dungeon + Sala */}
+        <div className="hud-pill hud-center-info">
+          <strong className="hud-title">
+            #{snapshot.dungeonId} {snapshot.dungeonName}
           </strong>
+          <span className="hud-room-tag">
+            Sala {snapshot.room}/2 · {light === 'dark' ? 'Sombrio' : 'Claro'}
+          </span>
         </div>
-        {snapshot.room === 2 && (
-          <div className="hud-block">
-            <span className="hud-label">{snapshot.enemyName.toUpperCase()}</span>
-            <strong>
-              {snapshot.enemyHp > 0 ? `HP ${snapshot.enemyHp}/${snapshot.enemyMaxHp}` : 'Derrotado!'}
-            </strong>
-          </div>
-        )}
+
+        {/* Topo Direito: Status IoT compacto + Conectar + Opcoes */}
+        <div className="hud-right-group">
+          <span className={`badge ${connectionMode}`}>
+            {connectionMode === 'ble'
+              ? '● BLE'
+              : connectionMode === 'simulator'
+                ? '● SIM'
+                : connectionMode === 'connecting'
+                  ? '◌ BLE...'
+                  : '○ Off'}
+          </span>
+          <span className={`badge ${light === 'dark' ? 'dark-pill' : 'bright-pill'}`}>
+            {light === 'dark' ? `🌙 ${ldrPct}%` : `☀ ${ldrPct}%`}
+          </span>
+          <span className={`badge ${ledState === 1 ? 'led-on' : 'led-off'}`}>
+            {ledState === 1 ? '🔴' : '⚫'}
+          </span>
+          {connectionMode === 'disconnected' && (
+            <button type="button" className="btn btn-connect-mini" onClick={onConnectBle}>
+              🔌 Conectar
+            </button>
+          )}
+          <button
+            type="button"
+            className="btn options-trigger"
+            onClick={onOpenOptions}
+            aria-label="Abrir opções"
+          >
+            ⚙ Opções
+          </button>
+        </div>
       </div>
 
-      {/* Canvas Pixel Art 60fps */}
-      <div className="canvas-frame">
-        <canvas
-          ref={canvasRef}
-          width={CANVAS_WIDTH}
-          height={CANVAS_HEIGHT}
-          className="pixel-canvas"
-        />
-
-        {snapshot.status === 'victory' && (
-          <div className="canvas-overlay victory">
-            <h3>PORTAL ALCANÇADO!</h3>
-            <p>
-              {snapshot.dungeonName} concluída em {snapshot.elapsedSec}s.
-              {connected
-                ? ' Confirmação enviada ao ESP32 (LED piscando).'
-                : ' Conecte o ESP32 para sincronizar o LED físico.'}
-            </p>
-            <div className="overlay-actions">
-              <button type="button" className="btn btn-primary" onClick={onRequestNewDungeon}>
-                Próxima Dungeon
-              </button>
-              <button type="button" className="btn btn-secondary" onClick={onRetryDungeon}>
-                Jogar Novamente
-              </button>
-            </div>
+      {/* Avisos flutuantes (Erro BLE / Toast / Dica discreta) */}
+      <div className="fs-banners">
+        {errorMsg && !optionsOpen && (
+          <div className="fs-alert">
+            <strong>BLE:</strong> {errorMsg}
           </div>
         )}
-
-        {snapshot.status === 'defeat' && (
-          <div className="canvas-overlay defeat">
-            <h3>HERÓI DERROTADO</h3>
-            <p>O guardião da masmorra venceu esta tentativa.</p>
-            <div className="overlay-actions">
-              <button type="button" className="btn btn-primary" onClick={onRetryDungeon}>
-                Tentar Novamente
-              </button>
-              <button type="button" className="btn btn-secondary" onClick={() => setInventoryOpen(true)}>
-                🎒 Abrir Mochila
-              </button>
-            </div>
-          </div>
-        )}
+        {toastMsg && <div className="fs-toast">{toastMsg}</div>}
+        {!toastMsg && !errorMsg && <div className="fs-hint">{snapshot.hintText}</div>}
       </div>
 
-      <div className="hint-strip">{snapshot.hintText}</div>
-
-      {/* Controles fluidos estilo Soul Knight: Analogico 360° + Atacar + Dash + Pocao + Mochila */}
-      <div className="controls-deck">
+      {/* Controle Flutuante Inferior Esquerdo: Analogico 360° */}
+      <div className="fs-ctrl-left">
         <div
           ref={stickZoneRef}
-          className="joystick-base"
+          className="joystick-base fs-joystick"
           aria-label="Analógico virtual 360 graus"
           onPointerDown={(e) => {
             e.preventDefault();
@@ -274,56 +275,94 @@ export const GameCanvas: React.FC<GameCanvasProps> = ({
             style={{ transform: `translate(${knobOffset.x}px, ${knobOffset.y}px)` }}
           />
         </div>
+      </div>
 
-        <div className="action-cluster">
-          <div className="combat-btns">
-            <button
-              type="button"
-              className="dash-btn"
-              onPointerDown={(e) => {
-                e.preventDefault();
-                pendingActionRef.current.dash = true;
-              }}
-            >
-              ⚡ DASH
-            </button>
-            <button
-              type="button"
-              className="attack-btn"
-              onPointerDown={(e) => {
-                e.preventDefault();
-                pendingActionRef.current.attack = true;
-              }}
-            >
-              ⚔ ATACAR
-            </button>
-          </div>
-          <div className="sub-actions">
-            <button
-              type="button"
-              className="btn potion-btn"
-              disabled={inv.potions <= 0 || snapshot.playerHp >= snapshot.playerMaxHp}
-              onClick={() => engine.usePotion()}
-            >
-              🧪 Poção ({inv.potions})
-            </button>
-            <button
-              type="button"
-              className="btn bag-btn"
-              onClick={() => {
-                setInvFeedback('');
-                setInventoryOpen((v) => !v);
-              }}
-            >
-              🎒 Mochila
-            </button>
-            <button type="button" className="btn btn-secondary" onClick={onRequestNewDungeon}>
-              Nova Dungeon
-            </button>
-          </div>
-          <span className="kbd-tip">WASD · Espaço (Atacar) · Shift (Dash) · E (Poção) · I (Mochila)</span>
+      {/* Controle Flutuante Inferior Direito: Atacar, Dash, Pocao, Mochila, Nova Dungeon */}
+      <div className="fs-ctrl-right">
+        <div className="fs-mini-row">
+          <button
+            type="button"
+            className="btn fs-mini-btn potion-btn"
+            disabled={inv.potions <= 0 || snapshot.playerHp >= snapshot.playerMaxHp}
+            onClick={() => engine.usePotion()}
+          >
+            🧪 {inv.potions}
+          </button>
+          <button
+            type="button"
+            className="btn fs-mini-btn bag-btn"
+            onClick={() => {
+              setInvFeedback('');
+              setInventoryOpen(true);
+            }}
+          >
+            🎒 Mochila
+          </button>
+          <button type="button" className="btn fs-mini-btn btn-secondary" onClick={onRequestNewDungeon}>
+            🎲 Mapa
+          </button>
+        </div>
+
+        <div className="fs-combat-row">
+          <button
+            type="button"
+            className="dash-btn fs-dash"
+            onPointerDown={(e) => {
+              e.preventDefault();
+              pendingActionRef.current.dash = true;
+            }}
+          >
+            ⚡ DASH
+          </button>
+          <button
+            type="button"
+            className="attack-btn fs-attack"
+            onPointerDown={(e) => {
+              e.preventDefault();
+              pendingActionRef.current.attack = true;
+            }}
+          >
+            ⚔
+          </button>
         </div>
       </div>
+
+      {/* Overlay de Vitoria */}
+      {snapshot.status === 'victory' && (
+        <div className="canvas-overlay victory">
+          <h3>PORTAL ALCANÇADO!</h3>
+          <p>
+            {snapshot.dungeonName} concluída em {snapshot.elapsedSec}s.
+            {connected
+              ? ' Confirmação enviada ao ESP32 (LED piscando).'
+              : ' Conecte o ESP32 em ⚙ Opções para sincronizar o LED físico.'}
+          </p>
+          <div className="overlay-actions">
+            <button type="button" className="btn btn-primary" onClick={onRequestNewDungeon}>
+              Próxima Dungeon
+            </button>
+            <button type="button" className="btn btn-secondary" onClick={onRetryDungeon}>
+              Jogar Novamente
+            </button>
+          </div>
+        </div>
+      )}
+
+      {/* Overlay de Derrota */}
+      {snapshot.status === 'defeat' && (
+        <div className="canvas-overlay defeat">
+          <h3>HERÓI DERROTADO</h3>
+          <p>O guardião da masmorra venceu esta tentativa.</p>
+          <div className="overlay-actions">
+            <button type="button" className="btn btn-primary" onClick={onRetryDungeon}>
+              Tentar Novamente
+            </button>
+            <button type="button" className="btn bag-btn" onClick={() => setInventoryOpen(true)}>
+              🎒 Abrir Mochila
+            </button>
+          </div>
+        </div>
+      )}
 
       {/* Modal de Inventario, Equipamentos e Forja */}
       {inventoryOpen && (

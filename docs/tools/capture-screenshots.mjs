@@ -33,10 +33,10 @@ const server = http.createServer((req, res) => {
 await new Promise((resolve) => server.listen(4173, '127.0.0.1', resolve));
 
 const shots = [
-  { demo: 'bright', file: 'app-jogo-claro.png', width: 860, height: 960, waitMs: 350 },
-  { demo: 'dark', file: 'app-jogo-escuro.png', width: 860, height: 960, waitMs: 350 },
-  { demo: 'telemetry', file: 'app-telemetria.png', width: 860, height: 900, waitMs: 350 },
-  { demo: 'control', file: 'app-controle-seguranca.png', width: 860, height: 960, waitMs: 500 },
+  { demo: 'bright', file: 'app-jogo-claro.png', width: 960, height: 540, waitMs: 350 },
+  { demo: 'dark', file: 'app-jogo-escuro.png', width: 960, height: 540, waitMs: 350 },
+  { demo: 'telemetry', file: 'app-telemetria.png', width: 920, height: 760, waitMs: 350 },
+  { demo: 'control', file: 'app-controle-seguranca.png', width: 920, height: 820, waitMs: 500 },
 ];
 
 let browser;

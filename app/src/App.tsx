@@ -11,7 +11,6 @@ import { TelemetryPanel, type TelemetryRecord } from './components/TelemetryPane
 import { DungeonGameEngine, type GameSnapshot } from './game/engine';
 
 type OptionsTab = 'hardware' | 'telemetry';
-type PhysicalButtonMode = 'dungeon' | 'attack';
 
 function formatNow(): string {
   return new Date().toLocaleTimeString('pt-BR', { hour12: false });
@@ -20,9 +19,6 @@ function formatNow(): string {
 export const App: React.FC = () => {
   const [optionsOpen, setOptionsOpen] = useState(false);
   const [optionsTab, setOptionsTab] = useState<OptionsTab>('hardware');
-  const [buttonMode, setButtonMode] = useState<PhysicalButtonMode>('dungeon');
-  const buttonModeRef = useRef<PhysicalButtonMode>('dungeon');
-  buttonModeRef.current = buttonMode;
 
   const [connectionMode, setConnectionMode] = useState<ConnectionMode>('disconnected');
   const [deviceLabel, setDeviceLabel] = useState('Nenhum dispositivo');
@@ -40,8 +36,6 @@ export const App: React.FC = () => {
   const recordCounterRef = useRef(0);
   const bleServiceRef = useRef<DungeonBleService | null>(null);
   const onStateChangeRef = useRef<(snap: GameSnapshot) => void>(() => {});
-  const hwJoyRef = useRef({ x: 0, y: 0, active: false });
-  const initialHandshakeDoneRef = useRef(false);
 
   const engine = useMemo(
     () =>
@@ -79,10 +73,6 @@ export const App: React.FC = () => {
         setConnectionMode(mode);
         setDeviceLabel(label);
         setErrorMsg(err || '');
-        if (mode === 'disconnected') {
-          hwJoyRef.current = { x: 0, y: 0, active: false };
-          initialHandshakeDoneRef.current = false;
-        }
       },
       onLog: (entry) => {
         setPacketLogs((prev) => [entry, ...prev].slice(0, 60));
@@ -97,12 +87,6 @@ export const App: React.FC = () => {
           return;
         }
         if (payload.type === 'joy') {
-          hwJoyRef.current.x = Math.max(-1, Math.min(1, payload.x / 100));
-          hwJoyRef.current.y = Math.max(-1, Math.min(1, payload.y / 100));
-          hwJoyRef.current.active = true;
-          if (payload.btn === 1) {
-            engine.triggerAttack();
-          }
           return;
         }
 
@@ -128,14 +112,6 @@ export const App: React.FC = () => {
         setTelemetryHistory((prev) => [...prev, rec].slice(-120));
 
         if (payload.type === 'dungeon_req') {
-          // Se o usuario configurou o botao D27 como "Atacar" em Opcoes (apos o handshake inicial)
-          if (initialHandshakeDoneRef.current && buttonModeRef.current === 'attack') {
-            engine.triggerAttack();
-            engine.triggerDash(hwJoyRef.current.x, hwJoyRef.current.y);
-            service.sendAck('loaded', String(payload.dungeon_id)).catch(() => {});
-            return;
-          }
-          initialHandshakeDoneRef.current = true;
           engine.loadDungeon(payload.dungeon_id, payload.light, true);
           service.sendAck('loaded', String(payload.dungeon_id)).catch(() => {});
           showToast(
@@ -221,7 +197,6 @@ export const App: React.FC = () => {
 
   const handleRequestNewDungeon = () => {
     if (connectionMode === 'ble' || connectionMode === 'simulator') {
-      initialHandshakeDoneRef.current = false;
       bleServiceRef.current?.sendNewDungeonCommand().catch(() => {});
     } else {
       const nextId = (gameSnapshot.dungeonId % 3) + 1;
@@ -251,71 +226,25 @@ export const App: React.FC = () => {
   const isConnected = connectionMode === 'ble' || connectionMode === 'simulator';
 
   return (
-    <div className="app-shell game-shell">
-      {/* Barra superior estilo Jogo Arcade / Soul Knight */}
-      <header className="game-topbar">
-        <div className="game-brand">
-          <div className="brand-crest" aria-hidden="true">⚔</div>
-          <div>
-            <h1>DUNGEONLINK</h1>
-            <small>IoT Pixel Roguelike</small>
-          </div>
-        </div>
+    <div className="fs-root">
+      <GameCanvas
+        engine={engine}
+        snapshot={gameSnapshot}
+        light={light}
+        ldrPct={ldrPct}
+        ledState={ledState}
+        connectionMode={connectionMode}
+        connected={isConnected}
+        errorMsg={errorMsg}
+        toastMsg={toastMsg}
+        optionsOpen={optionsOpen}
+        onConnectBle={handleConnectBle}
+        onOpenOptions={() => setOptionsOpen(true)}
+        onRequestNewDungeon={handleRequestNewDungeon}
+        onRetryDungeon={handleRetryDungeon}
+      />
 
-        {/* R5: Estado do hardware sempre visivel de forma compacta sem poluir o jogo */}
-        <div className="game-topbar-right">
-          <span className={`badge ${connectionMode}`}>
-            {connectionMode === 'ble'
-              ? '● BLE'
-              : connectionMode === 'simulator'
-                ? '● SIM'
-                : connectionMode === 'connecting'
-                  ? '◌ BLE...'
-                  : '○ Offline'}
-          </span>
-          <span className={`badge ${light === 'dark' ? 'dark-pill' : 'bright-pill'}`}>
-            {light === 'dark' ? `🌙 ${ldrPct}%` : `☀ ${ldrPct}%`}
-          </span>
-          <span className={`badge ${ledState === 1 ? 'led-on' : 'led-off'}`}>
-            {ledState === 1 ? '🔴 LED' : '⚫ LED'}
-          </span>
-          {connectionMode === 'disconnected' && (
-            <button type="button" className="btn btn-connect-mini" onClick={handleConnectBle}>
-              🔌 Conectar
-            </button>
-          )}
-          <button
-            type="button"
-            className={`btn options-trigger ${optionsOpen ? 'active' : ''}`}
-            onClick={() => setOptionsOpen((v) => !v)}
-          >
-            ⚙ Opções
-          </button>
-        </div>
-      </header>
-
-      {errorMsg && !optionsOpen && (
-        <div className="alert-box">
-          <strong>BLE:</strong> {errorMsg}
-        </div>
-      )}
-
-      {toastMsg && <div className="toast-banner">{toastMsg}</div>}
-
-      {/* Tela principal = 100% JOGO */}
-      <main className="main-content">
-        <GameCanvas
-          engine={engine}
-          snapshot={gameSnapshot}
-          light={light}
-          connected={isConnected}
-          hwJoyRef={hwJoyRef}
-          onRequestNewDungeon={handleRequestNewDungeon}
-          onRetryDungeon={handleRetryDungeon}
-        />
-      </main>
-
-      {/* Menu de Opcoes (Bluetooth, Joystick Fisico, Telemetria, Seguranca) */}
+      {/* Menu de Opcoes (Bluetooth, Telemetria, Modo Auto/Manual e Seguranca) */}
       {optionsOpen && (
         <div className="options-backdrop" onClick={() => setOptionsOpen(false)}>
           <div className="options-drawer" onClick={(e) => e.stopPropagation()}>
@@ -323,7 +252,7 @@ export const App: React.FC = () => {
               <div>
                 <h2>⚙ Opções &amp; Painel IoT</h2>
                 <span className="inv-sub">
-                  Conexão ESP32, Joystick Físico, Telemetria em Tempo Real e Segurança HMAC
+                  Conexão BLE ESP32, Telemetria LDR em Tempo Real e Segurança HMAC-SHA256
                 </span>
               </div>
               <button type="button" className="btn btn-secondary" onClick={() => setOptionsOpen(false)}>
@@ -337,7 +266,7 @@ export const App: React.FC = () => {
                 className={`tab-btn ${optionsTab === 'hardware' ? 'active' : ''}`}
                 onClick={() => setOptionsTab('hardware')}
               >
-                🔌 Bluetooth, Hardware &amp; Segurança
+                🔌 Bluetooth, Controle &amp; Segurança
               </button>
               <button
                 type="button"
@@ -350,32 +279,6 @@ export const App: React.FC = () => {
 
             {optionsTab === 'hardware' && (
               <div className="options-body">
-                {/* Configuracao do Botao/Joystick da Protoboard */}
-                <div className="card hw-joy-card">
-                  <h3>🕹 Controle Físico na Protoboard (Joystick / Botão D27)</h3>
-                  <p className="muted">
-                    Se usar módulo Joystick KY-023: ligue <code>VRx → D32</code>, <code>VRy → D33</code>,{' '}
-                    <code>SW → D27</code>, <code>+5V → 3V3</code> e <code>GND → GND</code> para mover o herói
-                    direto pela placa! Escolha abaixo o que o clique do botão <strong>D27</strong> faz:
-                  </p>
-                  <div className="btn-row">
-                    <button
-                      type="button"
-                      className={`btn ${buttonMode === 'dungeon' ? 'btn-primary' : 'btn-secondary'}`}
-                      onClick={() => setButtonMode('dungeon')}
-                    >
-                      🎲 Trocar Dungeon (Padrão IoT)
-                    </button>
-                    <button
-                      type="button"
-                      className={`btn ${buttonMode === 'attack' ? 'btn-primary' : 'btn-secondary'}`}
-                      onClick={() => setButtonMode('attack')}
-                    >
-                      ⚔ Atacar + Dash no Jogo
-                    </button>
-                  </div>
-                </div>
-
                 <ControlPanel
                   connectionMode={connectionMode}
                   deviceLabel={deviceLabel}
