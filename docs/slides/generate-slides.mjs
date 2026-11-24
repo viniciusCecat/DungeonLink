@@ -18,16 +18,19 @@ function imgPath(name) {
 function imgUri(name) {
   const p = imgPath(name);
   if (!p) return null;
-  return `data:image/png;base64,${fs.readFileSync(p).toString('base64')}`;
+  const ext = path.extname(p).toLowerCase() === '.jpg' ? 'jpeg' : 'png';
+  return `data:image/${ext};base64,${fs.readFileSync(p).toString('base64')}`;
 }
 
 const pClaro = imgPath('app-jogo-claro.png');
 const pEscuro = imgPath('app-jogo-escuro.png');
 const pTele = imgPath('app-telemetria.png');
 const pCtrl = imgPath('app-controle-seguranca.png');
+const pFoto1 = imgPath('foto-montagem-1.jpg');
+const pFoto2 = imgPath('foto-montagem-2.jpg');
 
 // ============================================================
-// 1. PPTX (16:9 widescreen, formato Pitch direto, zero código)
+// 1. PPTX (10 slides diretos, linguagem natural, zero código)
 // ============================================================
 const pptx = new PptxGenJS();
 pptx.layout = 'LAYOUT_WIDE';
@@ -43,18 +46,18 @@ const C = {
   blue: '4C6EF5',
   red: 'FF6B6B',
   text: 'EDF2FF',
-  muted: 'A5B1D2',
+  muted: 'B7C2E0',
 };
 
 function addSlideShell(slide, tag, title, pageNum) {
   slide.background = { color: C.bg };
   slide.addShape(pptx.ShapeType.rect, { x: 0, y: 0, w: 13.33, h: 0.08, fill: { color: C.accent } });
   slide.addText(tag.toUpperCase(), {
-    x: 0.65, y: 0.35, w: 9.0, h: 0.3,
+    x: 0.65, y: 0.34, w: 9.0, h: 0.3,
     fontSize: 10.5, bold: true, color: C.accent, charSpacing: 2,
   });
   slide.addText(title, {
-    x: 0.65, y: 0.64, w: 12.0, h: 0.58,
+    x: 0.65, y: 0.62, w: 12.0, h: 0.56,
     fontSize: 24, bold: true, color: C.text,
   });
   slide.addText(`DungeonLink  |  Vinicius Cecatto & Leonardo Scheffer Nunes  |  ${pageNum}/10`, {
@@ -74,11 +77,11 @@ function addCard(slide, x, y, w, h, title, body, accentColor = C.accent) {
   });
   slide.addText(title, {
     x: x + 0.24, y: y + 0.16, w: w - 0.38, h: 0.36,
-    fontSize: 14, bold: true, color: C.text,
+    fontSize: 14.5, bold: true, color: C.text,
   });
   slide.addText(body, {
     x: x + 0.24, y: y + 0.56, w: w - 0.38, h: h - 0.7,
-    fontSize: 12.5, color: C.muted, valign: 'top', lineSpacingMultiple: 1.25,
+    fontSize: 12.8, color: C.muted, valign: 'top', lineSpacingMultiple: 1.25,
   });
 }
 
@@ -99,159 +102,157 @@ function addCard(slide, x, y, w, h, title, body, accentColor = C.accent) {
     x: 1.2, y: 2.0, w: 10.8, h: 1.0,
     fontSize: 48, bold: true, color: C.text,
   });
-  s.addText('Quando a luz da sala e um botão físico controlam um jogo 2D no celular', {
-    x: 1.2, y: 3.05, w: 10.6, h: 0.75,
-    fontSize: 20, color: C.gold,
+  s.addText('Um jogo 2D no celular que reage ao vivo à luz da sala', {
+    x: 1.2, y: 3.08, w: 10.6, h: 0.7,
+    fontSize: 21, color: C.gold,
   });
   s.addText(
-    'Sensor real, Bluetooth de baixo consumo, decisão automática sem internet e proteção contra comandos falsos.',
-    { x: 1.2, y: 3.95, w: 10.4, h: 0.8, fontSize: 14.5, color: C.muted },
+    'Sensor físico na bancada, conexão Bluetooth direta, LED que responde sozinho no escuro e modo online CO-OP e X1.',
+    { x: 1.2, y: 3.92, w: 10.4, h: 0.8, fontSize: 14.5, color: C.muted },
   );
   s.addText('Vinicius Cecatto  ·  Leonardo Scheffer Nunes\nProf. Marcos Augusto Campagnaro Mucelini  |  23/11/2026', {
     x: 1.2, y: 5.2, w: 10.4, h: 0.75, fontSize: 13, color: C.text,
   });
 }
 
-// Slide 2: O Problema
+// Slide 2: A Ideia
 {
   const s = pptx.addSlide();
-  addSlideShell(s, '01 · O Problema', 'Por que projetos de sensores costumam parecer sem graça?', 2);
+  addSlideShell(s, '01 · A Ideia', 'Sair do sensor parado só mostrando número na tela', 2);
   addCard(
     s, 0.65, 1.5, 5.8, 2.45,
-    'Só números na tela do PC',
-    'Na maioria das práticas, o sensor só mostra valores soltos no computador ou pisca um LED isolado, sem interação de verdade.',
+    'O problema de sempre',
+    'Quase todo projeto de bancada só imprime leitura no computador ou acende uma luz isolada. Funciona, mas não chama atenção.',
     C.red,
   );
   addCard(
     s, 6.85, 1.5, 5.8, 2.45,
-    'Longe de quem usa',
-    'Fica difícil enxergar como o mundo físico pode mudar um aplicativo real na mão do usuário.',
+    'O que a gente quis fazer',
+    'Ligar um circuito simples de verdade a um jogo completo no celular, onde o ambiente muda o jogo na hora.',
     C.gold,
   );
   addCard(
     s, 0.65, 4.25, 12.0, 2.35,
-    'Nossa Ideia',
-    'E se apagar a luz da sala e apertar um botão na mesa mudassem uma aventura 2D no celular na mesma hora — funcionando até sem internet?',
+    'Como funciona na prática',
+    'Você tampou o sensor de luz na mesa: o LED vermelho acende sozinho na placa e a masmorra no celular escurece na hora, deixando só a luz da tocha.',
     C.accent,
   );
 }
 
-// Slide 3: A Solução
+// Slide 3: Na Bancada (Fotos Reais!)
 {
   const s = pptx.addSlide();
-  addSlideShell(s, '02 · A Solução', 'DungeonLink: da bancada direto para o celular', 3);
+  addSlideShell(s, '02 · Montagem Física', 'Circuito enxuto e funcionando sozinho na bancada', 3);
+  if (pFoto1) s.addImage({ path: pFoto1, x: 0.65, y: 1.45, w: 5.85, h: 4.35 });
+  if (pFoto2) s.addImage({ path: pFoto2, x: 6.83, y: 1.45, w: 5.85, h: 4.35 });
+  s.addText('Ambiente claro: sensor livre e LED vermelho apagado', {
+    x: 0.65, y: 5.95, w: 5.85, h: 0.35, fontSize: 12.5, bold: true, color: C.gold, align: 'center',
+  });
+  s.addText('Sensor tampado: LED acende sozinho, mesmo sem celular', {
+    x: 6.83, y: 5.95, w: 5.85, h: 0.35, fontSize: 12.5, bold: true, color: C.accent, align: 'center',
+  });
+  s.addText('Montagem limpa só com sensor de luz e LED vermelho — tiramos o botão extra da protoboard para simplificar o circuito.', {
+    x: 0.65, y: 6.45, w: 12.0, h: 0.4, fontSize: 11.5, color: C.muted, align: 'center',
+  });
+}
+
+// Slide 4: O Jogo na Tela
+{
+  const s = pptx.addSlide();
+  addSlideShell(s, '03 · O Jogo', 'Tela cheia horizontal reagindo ao sensor em tempo real', 4);
+  if (pClaro) s.addImage({ path: pClaro, x: 0.65, y: 1.55, w: 5.85, h: 3.3 });
+  if (pEscuro) s.addImage({ path: pEscuro, x: 6.83, y: 1.55, w: 5.85, h: 3.3 });
+  s.addText('Claro: mapa visível, guardas e baú dourado', {
+    x: 0.65, y: 4.95, w: 5.85, h: 0.35, fontSize: 12, bold: true, color: C.gold, align: 'center',
+  });
+  s.addText('Escuro: visão de tocha acompanhando o herói', {
+    x: 6.83, y: 4.95, w: 5.85, h: 0.35, fontSize: 12, bold: true, color: C.accent, align: 'center',
+  });
   addCard(
-    s, 0.65, 1.5, 3.8, 5.0,
-    '1. Na Mão do Jogador',
-    'Um sensor lê a luz da sala o tempo todo. Um botão físico sorteia novas fases. Um LED acende no escuro e pisca nas vitórias.',
-    C.accent,
-  );
-  addCard(
-    s, 4.75, 1.5, 3.8, 5.0,
-    '2. Sem Fio e Sem Roteador',
-    'A placa conversa direto com o celular por Bluetooth de baixo consumo, sem precisar de Wi-Fi da sala nem servidor fora.',
+    s, 0.65, 5.45, 12.03, 1.35,
+    'Conteúdo completo para jogar de verdade',
+    '3 masmorras com 3 salas cada (inimigos intermediários + chefe final), baús de tesouro, 7 armas, 5 armaduras, 3 relíquias, escudo recarregável e poções.',
     C.blue,
   );
-  addCard(
-    s, 8.85, 1.5, 3.8, 5.0,
-    '3. Jogo e Painel Vivo',
-    'O celular muda o visual da fase conforme a luz, tem combate com inimigo e portal, e mostra gráficos de leitura ao vivo.',
-    C.gold,
-  );
 }
 
-// Slide 4: Experiência na Pratica
+// Slide 5: Multiplayer CO-OP e X1
 {
   const s = pptx.addSlide();
-  addSlideShell(s, '03 · Na Prática', 'A luz da bancada muda o visual do jogo ao vivo', 4);
-  if (pClaro) s.addImage({ path: pClaro, x: 0.65, y: 1.45, w: 5.85, h: 4.9 });
-  if (pEscuro) s.addImage({ path: pEscuro, x: 6.83, y: 1.45, w: 5.85, h: 4.9 });
-  s.addText('Sala clara: fase toda iluminada e LED apagado', {
-    x: 0.65, y: 6.45, w: 5.85, h: 0.35, fontSize: 12, bold: true, color: C.gold, align: 'center',
-  });
-  s.addText('Sensor tampado: modo sombrio com tocha + LED da placa aceso', {
-    x: 6.83, y: 6.45, w: 5.85, h: 0.35, fontSize: 12, bold: true, color: C.accent, align: 'center',
-  });
-}
-
-// Slide 5: As 4 Camadas
-{
-  const s = pptx.addSlide();
-  addSlideShell(s, '04 · Como Funciona', 'As quatro camadas conversando nos dois sentidos', 5);
-  addCard(s, 0.65, 1.55, 2.8, 4.9, 'Percepção', 'Sensor mede a luz; botão pede nova fase; LEDs mostram o estado na placa.', C.accent);
-  addCard(s, 3.7, 1.55, 2.8, 4.9, 'Processamento', 'A placa decide o LED sozinha e confere a segurança. O celular roda o jogo e os gráficos.', C.blue);
-  addCard(s, 6.75, 1.55, 2.8, 4.9, 'Rede Sem Fio', 'Bluetooth direto entre a placa e o celular mandando e recebendo eventos.', C.gold);
-  addCard(s, 9.8, 1.55, 2.85, 4.9, 'Aplicação', 'Aventura 2D com 2 salas por fase, inimigo, portal, gráfico e controles na tela.', C.accent);
-}
-
-// Slide 6: Autonomia Offline
-{
-  const s = pptx.addSlide();
-  addSlideShell(s, '05 · Funciona Sem Internet', 'A placa decide sozinha mesmo sem celular conectado', 6);
+  addSlideShell(s, '04 · Multiplayer Online', 'Dá para jogar junto ou X1 até em casas diferentes', 5);
   addCard(
     s, 0.65, 1.55, 5.85, 2.45,
-    'Regra Local Automática',
-    'Ligou na tomada ou power bank, ela já funciona: se escurecer na sala, o LED vermelho acende sozinho na hora.',
+    'Modo CO-OP',
+    'Dois jogadores entram na mesma masmorra, limpam as 3 salas juntos e enfrentam o chefe em equipe.',
     C.accent,
   );
   addCard(
     s, 6.83, 1.55, 5.85, 2.45,
-    'Sem Ficar Piscando',
-    'O sistema tira média das leituras e usa uma margem dupla entre claro e escuro para sombras rápidas não confundirem o LED.',
-    C.gold,
+    'Modo X1 (Duelo)',
+    'Arena simétrica 1 contra 1 com placar ao vivo, escudo, esquiva e troca livre de armas na mochila.',
+    C.red,
   );
   addCard(
-    s, 0.65, 4.3, 12.03, 2.3,
-    'Resposta Física para Cada Vitória',
-    'Com o celular conectado, carregar uma fase faz o LED piscar 3 vezes e passar pelo portal final faz o LED comemorar piscando 5 vezes.',
-    C.blue,
+    s, 0.65, 4.3, 12.03, 2.25,
+    'Simples de entrar: código de 4 letras',
+    'Um cria a sala e recebe um código curto. O amigo abre pelo celular ou navegador — mesmo em outra rede e sem instalar nada extra — digita o código e já entra na partida.',
+    C.gold,
   );
 }
 
-// Slide 7: Por que Bluetooth Low Energy?
+// Slide 6: Como o Sistema Conversa
 {
   const s = pptx.addSlide();
-  addSlideShell(s, '06 · Escolha Sem Fio', 'Por que usamos Bluetooth de baixo consumo?', 7);
-  addCard(s, 0.65, 1.55, 5.85, 2.35, 'Sem Depender de Wi-Fi', 'Não precisa de senha da rede da faculdade, roteador nem servidor na nuvem. É ligar e apresentar.', C.accent);
-  addCard(s, 6.83, 1.55, 5.85, 2.35, 'Gasta Bem Menos Energia', 'Consome muito menos que Wi-Fi ligado direto, facilitando usar bateria no futuro.', C.gold);
-  addCard(s, 0.65, 4.2, 5.85, 2.35, 'Alcance Certo (10 a 30 m)', 'Feito sob medida para o jogador segurar a placa e o celular na mesma mesa ou sala.', C.blue);
-  addCard(s, 6.83, 4.2, 5.85, 2.35, 'Rápido e Leve', 'Velocidade de sobra para mensagens curtas em tempo real, sem atrasos no jogo.', C.accent);
+  addSlideShell(s, '05 · Arquitetura', 'Quatro camadas trabalhando juntas sem complicação', 6);
+  addCard(s, 0.65, 1.55, 2.8, 4.9, '1. Sensor e LED', 'Lê a luz da sala o tempo todo e aciona o LED vermelho na protoboard.', C.accent);
+  addCard(s, 3.7, 1.55, 2.8, 4.9, '2. Placa Local', 'Filtra ruído da luz, decide o LED sozinha no escuro e checa a segurança.', C.blue);
+  addCard(s, 6.75, 1.55, 2.8, 4.9, '3. Bluetooth', 'Liga a placa direto no celular sem precisar de roteador nem senha de Wi-Fi.', C.gold);
+  addCard(s, 9.8, 1.55, 2.85, 4.9, '4. App no Celular', 'Roda o jogo em tela cheia, o multiplayer, os gráficos de luz e o controle manual.', C.accent);
+}
+
+// Slide 7: Autonomia e Bluetooth
+{
+  const s = pptx.addSlide();
+  addSlideShell(s, '06 · Por que Bluetooth e Regra Local?', 'Funciona na hora, gasta pouco e não trava sem internet', 7);
+  addCard(s, 0.65, 1.55, 5.85, 2.35, 'Decisão sozinha na placa', 'Mesmo desligando o celular, cobrir o sensor continua acendendo o LED na hora. Média de leituras e margem dupla evitam o LED ficar piscando.', C.accent);
+  addCard(s, 6.83, 1.55, 5.85, 2.35, 'Bluetooth de baixo consumo', 'Não depende da rede Wi-Fi da faculdade, consome bem menos energia e tem alcance sob medida (10 a 30 m) para a bancada.', C.gold);
+  addCard(s, 0.65, 4.2, 12.03, 2.35, 'Resposta física para o que acontece no jogo', 'Carregou nova masmorra? O LED pisca 3 vezes. Passou pelo portal da vitória? Pisca 5 vezes comemorando na bancada.', C.blue);
 }
 
 // Slide 8: Painel e Telemetria
 {
   const s = pptx.addSlide();
-  addSlideShell(s, '07 · Tudo Visível na Tela', 'Status completo sem precisar de cabo no computador', 8);
-  if (pTele) s.addImage({ path: pTele, x: 0.65, y: 1.45, w: 6.2, h: 5.3 });
-  addCard(s, 7.15, 1.5, 5.5, 1.6, 'Barra Sempre Visível', 'Mostra conexão Bluetooth, porcentagem de luz e se o LED físico está aceso.', C.accent);
-  addCard(s, 7.15, 3.3, 5.5, 1.6, 'Gráfico e Histórico', 'Desenha a curva de luz ao vivo e deixa baixar a tabela para conferir depois.', C.gold);
-  addCard(s, 7.15, 5.1, 5.5, 1.6, 'Modo Automático ou Manual', 'Você escolhe se a luz do ambiente manda no LED ou se liga e apaga pelo botão do app.', C.blue);
+  addSlideShell(s, '07 · Painel no Celular', 'Tudo visível no menu Opções sem precisar do computador', 8);
+  if (pTele) s.addImage({ path: pTele, x: 0.65, y: 1.5, w: 6.2, h: 5.1 });
+  addCard(s, 7.15, 1.5, 5.5, 1.55, 'Status no topo do jogo', 'Enquanto joga, já dá para ver conexão Bluetooth, luz em porcentagem e estado do LED.', C.accent);
+  addCard(s, 7.15, 3.28, 5.5, 1.55, 'Gráfico ao vivo', 'Dentro de Opções, a curva de luz atualiza em tempo real e guarda o histórico.', C.gold);
+  addCard(s, 7.15, 5.06, 5.5, 1.55, 'Automático ou Manual', 'Você escolhe se a luz manda no LED ou se liga e apaga direto pelo botão na tela.', C.blue);
 }
 
 // Slide 9: Segurança
 {
   const s = pptx.addSlide();
-  addSlideShell(s, '08 · Segurança Ativa', 'Protegido contra chaves vazadas e comandos falsos', 9);
-  if (pCtrl) s.addImage({ path: pCtrl, x: 0.65, y: 1.45, w: 6.1, h: 5.3 });
-  addCard(s, 7.05, 1.5, 5.6, 1.6, 'Senhas Fora do GitHub', 'As chaves secretas ficam só no equipamento de quem monta; no repositório sobem só exemplos vazios.', C.accent);
-  addCard(s, 7.05, 3.3, 5.6, 1.6, 'Mensagens Assinadas', 'Cada comando leva assinatura digital e contagem de ordem para bloquear cópias ou invasões.', C.blue);
-  addCard(s, 7.05, 5.1, 5.6, 1.6, 'Bloqueio Provado ao Vivo', 'Um botão de teste manda um comando falso e mostra a placa recusando na hora.', C.red);
+  addSlideShell(s, '08 · Segurança na Prática', 'Nada de senha vazada nem comando falso aceito', 9);
+  if (pCtrl) s.addImage({ path: pCtrl, x: 0.65, y: 1.5, w: 6.1, h: 5.1 });
+  addCard(s, 7.05, 1.5, 5.6, 1.55, 'Chaves fora do repositório', 'As senhas ficam só na placa e no app local; no repositório público sobem só arquivos modelo.', C.accent);
+  addCard(s, 7.05, 3.28, 5.6, 1.55, 'Assinatura e ordem', 'Cada comando leva assinatura digital e número de sequência para barrar cópias repetidas.', C.blue);
+  addCard(s, 7.05, 5.06, 5.6, 1.55, 'Teste de invasão ao vivo', 'No painel existe um botão que envia um comando forjado e mostra a placa rejeitando na hora.', C.red);
 }
 
-// Slide 10: Demo e Futuro
+// Slide 10: Demonstração e Fechamento
 {
   const s = pptx.addSlide();
-  addSlideShell(s, '09 · Demonstração e Futuro', 'Funcionando ao vivo agora — e pronto para crescer', 10);
+  addSlideShell(s, '09 · Demonstração', 'O que entregamos rodando de verdade hoje', 10);
   addCard(
     s, 0.65, 1.55, 5.85, 4.95,
-    'O que vamos mostrar ao vivo',
-    '1. LED acendendo sozinho no escuro sem celular ligado.\n\n2. Conexão Bluetooth direta com o Android.\n\n3. Botão criando fase e luz mudando o cenário.\n\n4. Vitória piscando o LED e bloqueio de comando falso.',
+    'Roteiro da demonstração',
+    '1. Cobrir o sensor sem o celular: LED acende sozinho.\n\n2. Conectar por Bluetooth no Android.\n\n3. Mostrar a luz da mesa mudando o mapa do jogo ao vivo.\n\n4. Testar modo manual do LED e bloqueio de comando falso.\n\n5. Mostrar combate nas salas, mochila e sala online CO-OP / X1.',
     C.accent,
   );
   addCard(
     s, 6.83, 1.55, 5.85, 4.95,
-    'Próximos passos',
-    '• Usar bateria recarregável para jogar sem cabo.\n\n• Atualizar o dispositivo sem fio.\n\n• Modo duelo (PvP) entre dois celulares.\n\n• Novos sensores físicos criando armadilhas nas fases.',
+    'O que pode vir depois',
+    '• Colocar bateria recarregável na placa para dispensar o cabo USB.\n\n• Adicionar novos sensores físicos (temperatura ou movimento) criando armadilhas nas fases.\n\n• Expandir para mais fases e chefes.\n\nObrigado! Aberto para perguntas.',
     C.gold,
   );
 }
@@ -262,12 +263,14 @@ fs.copyFileSync(pptxLocal, pptxDist);
 console.log('[OK] PPTX gerado:', pptxLocal);
 
 // ============================================================
-// 2. PDF dos Slides (10 páginas 16:9)
+// 2. PDF dos Slides (10 páginas 16:9 espelhando o PPTX)
 // ============================================================
 const uClaro = imgUri('app-jogo-claro.png');
 const uEscuro = imgUri('app-jogo-escuro.png');
 const uTele = imgUri('app-telemetria.png');
 const uCtrl = imgUri('app-controle-seguranca.png');
+const uFoto1 = imgUri('foto-montagem-1.jpg');
+const uFoto2 = imgUri('foto-montagem-2.jpg');
 
 const slidesHtml = `<!doctype html>
 <html lang="pt-BR">
@@ -291,10 +294,9 @@ const slidesHtml = `<!doctype html>
   }
   .slide:last-child { page-break-after: auto; }
   .tag { font-size: 11pt; font-weight: 700; letter-spacing: 2px; color: #38d9a9; text-transform: uppercase; }
-  h1 { margin: 6px 0 0; font-size: 26pt; color: #edf2ff; }
+  h1 { margin: 6px 0 0; font-size: 25pt; color: #edf2ff; }
   .footer { text-align: right; font-size: 10pt; color: #a5b1d2; }
-  .grid-2 { display: grid; grid-template-columns: 1fr 1fr; gap: 22px; flex: 1; margin: 18px 0 10px; }
-  .grid-3 { display: grid; grid-template-columns: repeat(3, 1fr); gap: 20px; flex: 1; margin: 20px 0 10px; }
+  .grid-2 { display: grid; grid-template-columns: 1fr 1fr; gap: 22px; flex: 1; margin: 16px 0 10px; }
   .grid-4 { display: grid; grid-template-columns: repeat(4, 1fr); gap: 16px; flex: 1; margin: 20px 0 10px; }
   .card {
     background: #141927;
@@ -319,9 +321,10 @@ const slidesHtml = `<!doctype html>
     margin: auto 0;
   }
   .cover-title { font-size: 48pt; margin: 12px 0 8px; }
-  .cover-sub { font-size: 20pt; color: #f59f00; margin: 0 0 16px; }
+  .cover-sub { font-size: 21pt; color: #f59f00; margin: 0 0 16px; }
   .img-col { display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 8px; }
-  .img-col img { max-width: 100%; max-height: 4.9in; border-radius: 10px; border: 1.5px solid #2e3856; }
+  .img-col img { max-width: 100%; max-height: 4.5in; border-radius: 10px; border: 1.5px solid #2e3856; }
+  .img-col.game img { max-height: 3.3in; }
   .stack-col { display: flex; flex-direction: column; gap: 14px; justify-content: center; }
 </style>
 </head>
@@ -329,120 +332,125 @@ const slidesHtml = `<!doctype html>
 
 <div class="slide">
   <div class="cover-box">
-    <div class="tag">Internet das Coisas  ·  Projeto Final 2026</div>
+    <div class="tag">Internet das Coisas · Projeto Final 2026</div>
     <h1 class="cover-title">DungeonLink</h1>
-    <p class="cover-sub">Quando a luz da sala e um botão físico controlam um jogo 2D no celular</p>
+    <p class="cover-sub">Um jogo 2D no celular que reage ao vivo à luz da sala</p>
     <p style="font-size:14.5pt;color:#b7c2e0;line-height:1.5;margin:0 0 28px;">
-      Sensor real, Bluetooth de baixo consumo, decisão automática sem internet e proteção contra comandos falsos.
+      Sensor físico na bancada, conexão Bluetooth direta, LED que responde sozinho no escuro e modo online CO-OP e X1.
     </p>
     <div style="font-size:13pt;color:#edf2ff;border-top:1px solid #2e3856;padding-top:14px;">
       <strong>Vinicius Cecatto &amp; Leonardo Scheffer Nunes</strong><br/>
-      Prof. Marcos Augusto Campagnaro Mucelini  |  23/11/2026
+      Prof. Marcos Augusto Campagnaro Mucelini | 23/11/2026
     </div>
   </div>
 </div>
 
 <div class="slide">
-  <div><div class="tag">01 · O Problema</div><h1>Por que projetos de sensores costumam parecer sem graça?</h1></div>
+  <div><div class="tag">01 · A Ideia</div><h1>Sair do sensor parado só mostrando número na tela</h1></div>
   <div style="display:flex;flex-direction:column;gap:18px;flex:1;margin:18px 0 10px;">
     <div class="grid-2" style="margin:0;">
-      <div class="card red"><h3>Só números na tela do PC</h3><p>Na maioria das práticas, o sensor só mostra valores soltos no computador ou pisca um LED isolado, sem interação de verdade.</p></div>
-      <div class="card gold"><h3>Longe de quem usa</h3><p>Fica difícil enxergar como o mundo físico pode mudar um aplicativo real na mão do usuário.</p></div>
+      <div class="card red"><h3>O problema de sempre</h3><p>Quase todo projeto de bancada só imprime leitura no computador ou acende uma luz isolada. Funciona, mas não chama atenção.</p></div>
+      <div class="card gold"><h3>O que a gente quis fazer</h3><p>Ligar um circuito simples de verdade a um jogo completo no celular, onde o ambiente muda o jogo na hora.</p></div>
     </div>
-    <div class="card"><h3>Nossa Ideia</h3><p>E se apagar a luz da sala e apertar um botão na mesa mudassem uma aventura 2D no celular na mesma hora — funcionando até sem internet?</p></div>
+    <div class="card"><h3>Como funciona na prática</h3><p>Você tampou o sensor de luz na mesa: o LED vermelho acende sozinho na placa e a masmorra no celular escurece na hora, deixando só a luz da tocha.</p></div>
   </div>
   <div class="footer">DungeonLink | Vinicius Cecatto &amp; Leonardo Scheffer Nunes | 2/10</div>
 </div>
 
 <div class="slide">
-  <div><div class="tag">02 · A Solução</div><h1>DungeonLink: da bancada direto para o celular</h1></div>
-  <div class="grid-3">
-    <div class="card"><h3>1. Na Mão do Jogador</h3><p>Um sensor lê a luz da sala o tempo todo. Um botão físico sorteia novas fases. Um LED acende no escuro e pisca nas vitórias.</p></div>
-    <div class="card blue"><h3>2. Sem Fio e Sem Roteador</h3><p>A placa conversa direto com o celular por Bluetooth de baixo consumo, sem precisar de Wi-Fi da sala nem servidor fora.</p></div>
-    <div class="card gold"><h3>3. Jogo e Painel Vivo</h3><p>O celular muda o visual da fase conforme a luz, tem combate com inimigo e portal, e mostra gráficos de leitura ao vivo.</p></div>
+  <div><div class="tag">02 · Montagem Física</div><h1>Circuito enxuto e funcionando sozinho na bancada</h1></div>
+  <div class="grid-2" style="flex:0 1 auto;margin:14px 0 6px;">
+    <div class="img-col">${uFoto1 ? `<img src="${uFoto1}" />` : ''}<strong style="color:#f59f00;">Ambiente claro: sensor livre e LED vermelho apagado</strong></div>
+    <div class="img-col">${uFoto2 ? `<img src="${uFoto2}" />` : ''}<strong style="color:#38d9a9;">Sensor tampado: LED acende sozinho, mesmo sem celular</strong></div>
   </div>
+  <p style="text-align:center;color:#b7c2e0;font-size:11.5pt;margin:0;">Montagem limpa só com sensor de luz e LED vermelho — tiramos o botão extra da protoboard para simplificar o circuito.</p>
   <div class="footer">DungeonLink | Vinicius Cecatto &amp; Leonardo Scheffer Nunes | 3/10</div>
 </div>
 
 <div class="slide">
-  <div><div class="tag">03 · Na Prática</div><h1>A luz da bancada muda o visual do jogo ao vivo</h1></div>
-  <div class="grid-2">
-    <div class="img-col">${uClaro ? `<img src="${uClaro}" />` : ''}<strong style="color:#f59f00;">Sala clara: fase toda iluminada e LED apagado</strong></div>
-    <div class="img-col">${uEscuro ? `<img src="${uEscuro}" />` : ''}<strong style="color:#38d9a9;">Sensor tampado: modo sombrio com tocha + LED da placa aceso</strong></div>
+  <div><div class="tag">03 · O Jogo</div><h1>Tela cheia horizontal reagindo ao sensor em tempo real</h1></div>
+  <div class="grid-2" style="flex:0 1 auto;margin:12px 0 8px;">
+    <div class="img-col game">${uClaro ? `<img src="${uClaro}" />` : ''}<strong style="color:#f59f00;">Claro: mapa visível, guardas e baú dourado</strong></div>
+    <div class="img-col game">${uEscuro ? `<img src="${uEscuro}" />` : ''}<strong style="color:#38d9a9;">Escuro: visão de tocha acompanhando o herói</strong></div>
+  </div>
+  <div class="card blue" style="padding:14px 18px;">
+    <h3>Conteúdo completo para jogar de verdade</h3>
+    <p>3 masmorras com 3 salas cada (inimigos intermediários + chefe final), baús de tesouro, 7 armas, 5 armaduras, 3 relíquias, escudo recarregável e poções.</p>
   </div>
   <div class="footer">DungeonLink | Vinicius Cecatto &amp; Leonardo Scheffer Nunes | 4/10</div>
 </div>
 
 <div class="slide">
-  <div><div class="tag">04 · Como Funciona</div><h1>As quatro camadas conversando nos dois sentidos</h1></div>
-  <div class="grid-4">
-    <div class="card"><h3>Percepção</h3><p>Sensor mede a luz; botão pede nova fase; LEDs mostram o estado na placa.</p></div>
-    <div class="card blue"><h3>Processamento</h3><p>A placa decide o LED sozinha e confere a segurança. O celular roda o jogo e os gráficos.</p></div>
-    <div class="card gold"><h3>Rede Sem Fio</h3><p>Bluetooth direto entre a placa e o celular mandando e recebendo eventos.</p></div>
-    <div class="card"><h3>Aplicação</h3><p>Aventura 2D com 2 salas por fase, inimigo, portal, gráfico e controles na tela.</p></div>
+  <div><div class="tag">04 · Multiplayer Online</div><h1>Dá para jogar junto ou X1 até em casas diferentes</h1></div>
+  <div style="display:flex;flex-direction:column;gap:18px;flex:1;margin:18px 0 10px;">
+    <div class="grid-2" style="margin:0;">
+      <div class="card"><h3>Modo CO-OP</h3><p>Dois jogadores entram na mesma masmorra, limpam as 3 salas juntos e enfrentam o chefe em equipe.</p></div>
+      <div class="card red"><h3>Modo X1 (Duelo)</h3><p>Arena simétrica 1 contra 1 com placar ao vivo, escudo, esquiva e troca livre de armas na mochila.</p></div>
+    </div>
+    <div class="card gold"><h3>Simples de entrar: código de 4 letras</h3><p>Um cria a sala e recebe um código curto. O amigo abre pelo celular ou navegador — mesmo em outra rede e sem instalar nada extra — digita o código e já entra na partida.</p></div>
   </div>
   <div class="footer">DungeonLink | Vinicius Cecatto &amp; Leonardo Scheffer Nunes | 5/10</div>
 </div>
 
 <div class="slide">
-  <div><div class="tag">05 · Funciona Sem Internet</div><h1>A placa decide sozinha mesmo sem celular conectado</h1></div>
-  <div style="display:flex;flex-direction:column;gap:18px;flex:1;margin:18px 0 10px;">
-    <div class="grid-2" style="margin:0;">
-      <div class="card"><h3>Regra Local Automática</h3><p>Ligou na tomada ou power bank, ela já funciona: se escurecer na sala, o LED vermelho acende sozinho na hora.</p></div>
-      <div class="card gold"><h3>Sem Ficar Piscando</h3><p>O sistema tira média das leituras e usa uma margem dupla entre claro e escuro para sombras rápidas não confundirem o LED.</p></div>
-    </div>
-    <div class="card blue"><h3>Resposta Física para Cada Vitória</h3><p>Com o celular conectado, carregar uma fase faz o LED piscar 3 vezes e passar pelo portal final faz o LED comemorar piscando 5 vezes.</p></div>
+  <div><div class="tag">05 · Arquitetura</div><h1>Quatro camadas trabalhando juntas sem complicação</h1></div>
+  <div class="grid-4">
+    <div class="card"><h3>1. Sensor e LED</h3><p>Lê a luz da sala o tempo todo e aciona o LED vermelho na protoboard.</p></div>
+    <div class="card blue"><h3>2. Placa Local</h3><p>Filtra ruído da luz, decide o LED sozinha no escuro e checa a segurança.</p></div>
+    <div class="card gold"><h3>3. Bluetooth</h3><p>Liga a placa direto no celular sem precisar de roteador nem senha de Wi-Fi.</p></div>
+    <div class="card"><h3>4. App no Celular</h3><p>Roda o jogo em tela cheia, o multiplayer, os gráficos de luz e o controle manual.</p></div>
   </div>
   <div class="footer">DungeonLink | Vinicius Cecatto &amp; Leonardo Scheffer Nunes | 6/10</div>
 </div>
 
 <div class="slide">
-  <div><div class="tag">06 · Escolha Sem Fio</div><h1>Por que usamos Bluetooth de baixo consumo?</h1></div>
-  <div class="grid-2">
-    <div class="card"><h3>Sem Depender de Wi-Fi</h3><p>Não precisa de senha da rede da faculdade, roteador nem servidor na nuvem. É ligar e apresentar.</p></div>
-    <div class="card gold"><h3>Gasta Bem Menos Energia</h3><p>Consome muito menos que Wi-Fi ligado direto, facilitando usar bateria no futuro.</p></div>
-    <div class="card blue"><h3>Alcance Certo (10 a 30 m)</h3><p>Feito sob medida para o jogador segurar a placa e o celular na mesma mesa ou sala.</p></div>
-    <div class="card"><h3>Rápido e Leve</h3><p>Velocidade de sobra para mensagens curtas em tempo real, sem atrasos no jogo.</p></div>
+  <div><div class="tag">06 · Por que Bluetooth e Regra Local?</div><h1>Funciona na hora, gasta pouco e não trava sem internet</h1></div>
+  <div style="display:flex;flex-direction:column;gap:18px;flex:1;margin:18px 0 10px;">
+    <div class="grid-2" style="margin:0;">
+      <div class="card"><h3>Decisão sozinha na placa</h3><p>Mesmo desligando o celular, cobrir o sensor continua acendendo o LED na hora. Média de leituras e margem dupla evitam o LED ficar piscando.</p></div>
+      <div class="card gold"><h3>Bluetooth de baixo consumo</h3><p>Não depende da rede Wi-Fi da faculdade, consome bem menos energia e tem alcance sob medida (10 a 30 m) para a bancada.</p></div>
+    </div>
+    <div class="card blue"><h3>Resposta física para o que acontece no jogo</h3><p>Carregou nova masmorra? O LED pisca 3 vezes. Passou pelo portal da vitória? Pisca 5 vezes comemorando na bancada.</p></div>
   </div>
   <div class="footer">DungeonLink | Vinicius Cecatto &amp; Leonardo Scheffer Nunes | 7/10</div>
 </div>
 
 <div class="slide">
-  <div><div class="tag">07 · Tudo Visível na Tela</div><h1>Status completo sem precisar de cabo no computador</h1></div>
+  <div><div class="tag">07 · Painel no Celular</div><h1>Tudo visível no menu Opções sem precisar do computador</h1></div>
   <div class="grid-2">
     <div class="img-col">${uTele ? `<img src="${uTele}" />` : ''}</div>
     <div class="stack-col">
-      <div class="card"><h3>Barra Sempre Visível</h3><p>Mostra conexão Bluetooth, porcentagem de luz e se o LED físico está aceso.</p></div>
-      <div class="card gold"><h3>Gráfico e Histórico</h3><p>Desenha a curva de luz ao vivo e deixa baixar a tabela para conferir depois.</p></div>
-      <div class="card blue"><h3>Modo Automático ou Manual</h3><p>Você escolhe se a luz do ambiente manda no LED ou se liga e apaga pelo botão do app.</p></div>
+      <div class="card"><h3>Status no topo do jogo</h3><p>Enquanto joga, já dá para ver conexão Bluetooth, luz em porcentagem e estado do LED.</p></div>
+      <div class="card gold"><h3>Gráfico ao vivo</h3><p>Dentro de Opções, a curva de luz atualiza em tempo real e guarda o histórico.</p></div>
+      <div class="card blue"><h3>Automático ou Manual</h3><p>Você escolhe se a luz manda no LED ou se liga e apaga direto pelo botão na tela.</p></div>
     </div>
   </div>
   <div class="footer">DungeonLink | Vinicius Cecatto &amp; Leonardo Scheffer Nunes | 8/10</div>
 </div>
 
 <div class="slide">
-  <div><div class="tag">08 · Segurança Ativa</div><h1>Protegido contra chaves vazadas e comandos falsos</h1></div>
+  <div><div class="tag">08 · Segurança na Prática</div><h1>Nada de senha vazada nem comando falso aceito</h1></div>
   <div class="grid-2">
     <div class="img-col">${uCtrl ? `<img src="${uCtrl}" />` : ''}</div>
     <div class="stack-col">
-      <div class="card"><h3>Senhas Fora do GitHub</h3><p>As chaves secretas ficam só no equipamento de quem monta; no repositório sobem só exemplos vazios.</p></div>
-      <div class="card blue"><h3>Mensagens Assinadas</h3><p>Cada comando leva assinatura digital e contagem de ordem para bloquear cópias ou invasões.</p></div>
-      <div class="card red"><h3>Bloqueio Provado ao Vivo</h3><p>Um botão de teste manda um comando falso e mostra a placa recusando na hora.</p></div>
+      <div class="card"><h3>Chaves fora do repositório</h3><p>As senhas ficam só na placa e no app local; no repositório público sobem só arquivos modelo.</p></div>
+      <div class="card blue"><h3>Assinatura e ordem</h3><p>Cada comando leva assinatura digital e número de sequência para barrar cópias repetidas.</p></div>
+      <div class="card red"><h3>Teste de invasão ao vivo</h3><p>No painel existe um botão que envia um comando forjado e mostra a placa rejeitando na hora.</p></div>
     </div>
   </div>
   <div class="footer">DungeonLink | Vinicius Cecatto &amp; Leonardo Scheffer Nunes | 9/10</div>
 </div>
 
 <div class="slide">
-  <div><div class="tag">09 · Demonstração e Futuro</div><h1>Funcionando ao vivo agora — e pronto para crescer</h1></div>
+  <div><div class="tag">09 · Demonstração</div><h1>O que entregamos rodando de verdade hoje</h1></div>
   <div class="grid-2">
     <div class="card">
-      <h3>O que vamos mostrar ao vivo</h3>
-      <p>1. LED acendendo sozinho no escuro sem celular ligado.<br/><br/>2. Conexão Bluetooth direta com o Android.<br/><br/>3. Botão criando fase e luz mudando o cenário.<br/><br/>4. Vitória piscando o LED e bloqueio de comando falso.</p>
+      <h3>Roteiro da demonstração</h3>
+      <p>1. Cobrir o sensor sem o celular: LED acende sozinho.<br/><br/>2. Conectar por Bluetooth no Android.<br/><br/>3. Mostrar a luz da mesa mudando o mapa do jogo ao vivo.<br/><br/>4. Testar modo manual do LED e bloqueio de comando falso.<br/><br/>5. Mostrar combate nas salas, mochila e sala online CO-OP / X1.</p>
     </div>
     <div class="card gold">
-      <h3>Próximos passos</h3>
-      <p>• Usar bateria recarregável para jogar sem cabo.<br/><br/>• Atualizar o dispositivo sem fio.<br/><br/>• Modo duelo (PvP) entre dois celulares.<br/><br/>• Novos sensores físicos criando armadilhas nas fases.</p>
+      <h3>O que pode vir depois</h3>
+      <p>• Colocar bateria recarregável na placa para dispensar o cabo USB.<br/><br/>• Adicionar novos sensores físicos (temperatura ou movimento) criando armadilhas nas fases.<br/><br/>• Expandir para mais fases e chefes.<br/><br/><strong>Obrigado! Aberto para perguntas.</strong></p>
     </div>
   </div>
   <div class="footer">DungeonLink | Vinicius Cecatto &amp; Leonardo Scheffer Nunes | 10/10</div>

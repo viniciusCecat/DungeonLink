@@ -319,12 +319,12 @@ const html = `<!doctype html>
   <div class="cover-center">
     <h3>Resumo do Projeto</h3>
     <p>
-      O <strong>DungeonLink</strong> liga uma montagem física no <strong>ESP32 DevKit V1</strong> a um aplicativo Android. A luz do ambiente e um botão na protoboard mudam o jogo 2D em tempo real, enquanto o app mostra o histórico de leituras e manda confirmações para piscar o LED da placa. O sistema passa pelas quatro camadas de IoT (<em>Percepção → Rede → Processamento → Aplicação</em>), decide localmente mesmo sem internet ou celular conectado e protege todas as mensagens com assinatura <strong>HMAC-SHA256</strong>.
+      O <strong>DungeonLink</strong> liga uma montagem física no <strong>ESP32 DevKit V1</strong> a um jogo 2D no Android em tela cheia horizontal. A luz do ambiente muda o visual das fases em tempo real, enquanto o app mostra o histórico de leituras, oferece modo online (CO-OP e X1) e manda confirmações para piscar o LED da placa. O sistema passa pelas quatro camadas de IoT (<em>Percepção → Rede → Processamento → Aplicação</em>), decide localmente mesmo sem internet ou celular conectado e protege todas as mensagens com assinatura <strong>HMAC-SHA256</strong>.
     </p>
     <div class="cover-grid">
       <div class="cover-box">
         <strong>Na Protoboard:</strong><br/>
-        ESP32-WROOM-32, LDR GL5528 + 10 kΩ (pino D34), Botão tátil (D27), LED vermelho + 220 Ω (D26) e LED azul da placa (D2).
+        ESP32-WROOM-32, LDR GL5528 + 10 kΩ (D34), LED vermelho + 220 Ω (D26), botão nativo BOOT da placa (GPIO 0) e LED azul onboard (D2).
       </div>
       <div class="cover-box">
         <strong>No Celular e Segurança:</strong><br/>
@@ -365,7 +365,7 @@ const html = `<!doctype html>
 </p>
 <ul>
   <li><strong>Luz muda o jogo:</strong> o sensor LDR mede a claridade da sala. Quando escurece, o LED vermelho da placa acende sozinho como uma tocha e o jogo muda do modo claro para o modo sombrio.</li>
-  <li><strong>Botão sorteia fases:</strong> ao apertar o botão na protoboard, o ESP32 escolhe uma nova dungeon (IDs 1, 2 ou 3) com duas salas, um inimigo e o portal final.</li>
+  <li><strong>Troca de fases e modo online:</strong> o jogador pode sortear entre 3 masmorras (com 3 salas cada, inimigos intermediários, chefe e portal) pelo app ou pelo botão nativo <code>BOOT</code> do ESP32, além de jogar em dupla no modo <strong>CO-OP</strong> ou <strong>X1</strong>.</li>
   <li><strong>Resposta nos dois sentidos:</strong> quando a fase carrega ou o jogador vence no portal, o celular avisa o ESP32 por Bluetooth e o LED vermelho pisca confirmando.</li>
 </ul>
 <p>
@@ -383,7 +383,7 @@ const html = `<!doctype html>
   <tbody>
     <tr>
       <td><strong>R1 — Percepção e ação</strong></td>
-      <td>O LDR mede a luz e acende o LED vermelho (D26) no escuro automaticamente. O botão (D27) cria novas fases.</td>
+      <td>O LDR mede a luz e acende o LED vermelho (D26) no escuro automaticamente. O botão nativo <code>BOOT</code> da placa (ou o app) troca de fase.</td>
       <td>Tampar o LDR acende o LED na hora.</td>
     </tr>
     <tr>
@@ -426,10 +426,10 @@ const html = `<!doctype html>
 </div>
 
 <ul>
-  <li><strong>Percepção:</strong> sensor LDR + resistor 10 kΩ (luz), botão tátil (troca de fase) e dois LEDs (vermelho para luz/confirmações e azul para status do Bluetooth).</li>
+  <li><strong>Percepção:</strong> sensor LDR + resistor 10 kΩ (luz), botão nativo <code>BOOT</code> da própria placa (o botão externo foi removido da protoboard para simplificar a montagem) e dois LEDs (vermelho para luz/confirmações e azul para status do Bluetooth).</li>
   <li><strong>Processamento:</strong> o ESP32 filtra o sinal do sensor, controla o LED, sorteia fases e confere as assinaturas de segurança. O celular valida os dados recebidos, roda o jogo 2D e guarda o histórico.</li>
   <li><strong>Rede:</strong> Bluetooth Low Energy (BLE) com serviço próprio e duas características: uma para o ESP32 mandar dados (<code>TX</code>) e outra para receber comandos (<code>RX</code>).</li>
-  <li><strong>Aplicação:</strong> app Android com jogo de 3 fases (2 salas cada), painel de status sempre visível, gráfico em tempo real, tabela exportável em CSV e inspetor de segurança.</li>
+  <li><strong>Aplicação:</strong> app Android em tela cheia horizontal com 3 masmorras (3 salas cada), inventário (7 armas, 5 armaduras, 3 relíquias), modo online CO-OP/X1 e menu <strong>Opções</strong> com gráfico ao vivo, histórico CSV e inspetor de segurança.</li>
 </ul>
 
 <!-- ==================== 3. HARDWARE ==================== -->
@@ -473,10 +473,10 @@ const html = `<!doctype html>
       <td>O ADC1 funciona normalmente com Bluetooth ligado (pinos do ADC2 travam quando o rádio está ativo).</td>
     </tr>
     <tr>
-      <td><strong>Botão tátil 6×6 mm</strong></td>
-      <td><code>GPIO 27 (D27)</code></td>
+      <td><strong>Botão BOOT da placa</strong></td>
+      <td><code>GPIO 0</code> (nativo)</td>
       <td><code>INPUT_PULLUP</code> (ativo <code>LOW</code>)</td>
-      <td>Usa o resistor interno da placa (dispensa resistor externo) e tem filtro de 50 ms contra clique duplo.</td>
+      <td>Substitui o botão externo (removido da protoboard para deixar o circuito mais enxuto); também aceita troca de fase pelo app.</td>
     </tr>
     <tr>
       <td><strong>LED vermelho + 220 Ω</strong></td>
@@ -561,9 +561,9 @@ const html = `<!doctype html>
   Quando o app manda confirmação (<code>ack/loaded</code> ou <code>ack/victory</code>), a função <code>startLedBlinkPattern()</code> faz o LED piscar 3 vezes (fase carregada) ou 5 vezes (vitória) e depois volta sozinho ao estado normal do LED.
 </p>
 
-<h3>4.2 O jogo 2D e as telas do aplicativo</h3>
+<h3>4.2 O jogo 2D, inventário e modo multiplayer</h3>
 <p>
-  Cada uma das 3 dungeons (<em>Cripta das Pedras</em>, <em>Catacumba de Ossos</em> e <em>Forja Sombria</em>) tem duas salas desenhadas em grade 16×10. Na Sala 1, o jogador atravessa os obstáculos até a porta dourada. Na Sala 2, derrota o inimigo para abrir o Portal Final. Quando o sensor envia <code>"light": "dark"</code>, a tela escurece e acende um círculo de luz de tocha ao redor do herói.
+  O aplicativo roda em <strong>tela cheia horizontal</strong> no Android com analógico virtual 360° e botões de combate em arco (Ataque, Dash e Poção). Cada uma das 3 masmorras (<em>Cripta das Pedras</em>, <em>Catacumba de Ossos</em> e <em>Forja Sombria</em>) possui <strong>3 salas</strong>: as duas primeiras têm inimigos intermediários (<em>Goblin</em>, <em>Morcego</em> e <em>Diabrete</em>) e baús de tesouro; ao limpar a sala, a porta dourada abre até a Sala 3, onde o chefe protege o Portal Final. Na <strong>Mochila</strong>, o jogador equipa ou forja com ouro <strong>7 armas</strong>, <strong>5 armaduras</strong> e <strong>3 relíquias</strong>. Quando o LDR envia <code>"light": "dark"</code>, o mapa escurece com visão de tocha ao redor do herói. O menu <strong>Opções</strong> reúne a conexão BLE, a telemetria com gráfico, a segurança HMAC e salas online <strong>CO-OP</strong> e <strong>X1</strong> por código de 4 letras.
 </p>
 
 <div class="photo-grid">
