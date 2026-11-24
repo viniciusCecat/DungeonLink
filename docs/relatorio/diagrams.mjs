@@ -16,8 +16,8 @@ export function diagramFourLayersSvg() {
   <text x="30" y="74" fill="#0f172a" font-size="11" font-weight="700">Entradas Físicas:</text>
   <text x="30" y="92" fill="#334155" font-size="10.5">• LDR GL5528 + 10 kΩ</text>
   <text x="38" y="106" fill="#475569" font-size="9.5">(Pino D34 / ADC1 12 bits)</text>
-  <text x="30" y="126" fill="#334155" font-size="10.5">• Botão Tátil 6x6 mm</text>
-  <text x="38" y="140" fill="#475569" font-size="9.5">(Pino D27 / INPUT_PULLUP)</text>
+  <text x="30" y="126" fill="#334155" font-size="10.5">• Botão BOOT nativo</text>
+  <text x="38" y="140" fill="#475569" font-size="9.5">(GPIO 0 na própria placa)</text>
   <text x="30" y="164" fill="#0f172a" font-size="11" font-weight="700">Saídas (LEDs):</text>
   <text x="30" y="182" fill="#334155" font-size="10.5">• LED Vermelho + 220 Ω</text>
   <text x="38" y="196" fill="#475569" font-size="9.5">(Pino D26 — Tocha e ACK)</text>
@@ -56,9 +56,9 @@ export function diagramFourLayersSvg() {
   <rect x="598" y="24" width="164" height="30" rx="8" fill="#059669"/>
   <text x="680" y="44" text-anchor="middle" fill="#ffffff" font-size="12" font-weight="700">4. APLICAÇÃO</text>
   <text x="610" y="74" fill="#0f172a" font-size="11" font-weight="700">App Android DungeonLink:</text>
-  <text x="610" y="92" fill="#334155" font-size="10.5">• Jogo 2D (2 salas/fase)</text>
+  <text x="610" y="92" fill="#334155" font-size="10.5">• Jogo 2D (3 salas/fase)</text>
   <text x="610" y="108" fill="#334155" font-size="10.5">• Tema Claro / Sombrio</text>
-  <text x="610" y="124" fill="#334155" font-size="10.5">• Combate e Portal Final</text>
+  <text x="610" y="124" fill="#334155" font-size="10.5">• Mochila + CO-OP / X1</text>
   <text x="610" y="144" fill="#0f172a" font-size="11" font-weight="700">Painel na Tela (R5):</text>
   <text x="610" y="162" fill="#334155" font-size="10.5">• Status ao vivo no topo</text>
   <text x="610" y="178" fill="#334155" font-size="10.5">• Gráfico + Tabela + CSV</text>
@@ -116,14 +116,11 @@ export function diagramSchematicSvg() {
   <text x="298" y="248" fill="#e2e8f0" font-size="10.5" font-weight="600">GND</text>
 
   <!-- Pinos direita -->
-  <rect x="488" y="148" width="24" height="16" rx="2" fill="#34d399"/>
-  <text x="482" y="160" text-anchor="end" fill="#e2e8f0" font-size="10.5" font-weight="600">GPIO 27 (D27 / Botão)</text>
+  <rect x="488" y="176" width="24" height="16" rx="2" fill="#f87171"/>
+  <text x="482" y="188" text-anchor="end" fill="#e2e8f0" font-size="10.5" font-weight="600">GPIO 26 (D26 / LED)</text>
 
-  <rect x="488" y="200" width="24" height="16" rx="2" fill="#f87171"/>
-  <text x="482" y="212" text-anchor="end" fill="#e2e8f0" font-size="10.5" font-weight="600">GPIO 26 (D26 / LED)</text>
-
-  <rect x="488" y="248" width="24" height="16" rx="2" fill="#60a5fa"/>
-  <text x="482" y="260" text-anchor="end" fill="#e2e8f0" font-size="10.5" font-weight="600">GPIO 2 (LED Azul BLE)</text>
+  <rect x="488" y="236" width="24" height="16" rx="2" fill="#60a5fa"/>
+  <text x="482" y="248" text-anchor="end" fill="#e2e8f0" font-size="10.5" font-weight="600">GPIO 2 (LED Azul BLE)</text>
 
   <!-- USB -->
   <rect x="355" y="276" width="70" height="22" rx="3" fill="#cbd5e1" stroke="#475569"/>
@@ -156,31 +153,20 @@ export function diagramSchematicSvg() {
   <line x1="119" y1="260" x2="119" y2="336" stroke="#0f172a" stroke-width="2"/>
   <circle cx="119" cy="336" r="3.5" fill="#0f172a"/>
 
-  <!-- Circuito 2: Botão -->
-  <rect x="556" y="74" width="194" height="106" rx="8" fill="#ecfdf5" stroke="#059669" stroke-width="1.3"/>
-  <text x="653" y="94" text-anchor="middle" fill="#065f46" font-size="11" font-weight="700">BOTÃO NOVA FASE</text>
-  <polyline points="512,156 592,156 592,126" fill="none" stroke="#059669" stroke-width="2.2"/>
-  <circle cx="592" cy="126" r="3.5" fill="#059669"/>
-  <line x1="592" y1="126" x2="646" y2="112" stroke="#0f172a" stroke-width="2.2"/>
-  <circle cx="652" cy="126" r="3.5" fill="#0f172a"/>
-  <text x="622" y="146" text-anchor="middle" fill="#065f46" font-size="10" font-weight="700">Botão 6x6 mm</text>
-  <text x="622" y="160" text-anchor="middle" fill="#475569" font-size="9">(Pull-up interno do ESP32)</text>
-  <polyline points="652,126 720,126 720,336" fill="none" stroke="#0f172a" stroke-width="2"/>
-  <circle cx="720" cy="336" r="3.5" fill="#0f172a"/>
-
-  <!-- Circuito 3: LED + 220 -->
-  <rect x="556" y="190" width="194" height="122" rx="8" fill="#fef2f2" stroke="#dc2626" stroke-width="1.3"/>
-  <text x="653" y="210" text-anchor="middle" fill="#991b1b" font-size="11" font-weight="700">LED VERMELHO (R1/R2/ACK)</text>
-  <line x1="512" y1="208" x2="572" y2="236" stroke="#dc2626" stroke-width="2.2"/>
-  <rect x="572" y="224" width="48" height="24" rx="3" fill="#e2e8f0" stroke="#475569" stroke-width="1.5"/>
-  <text x="596" y="240" text-anchor="middle" fill="#1e293b" font-size="9.5" font-weight="700">220 Ω</text>
-  <line x1="620" y1="236" x2="644" y2="236" stroke="#dc2626" stroke-width="2"/>
-  <polygon points="644,224 644,248 666,236" fill="#ef4444" stroke="#991b1b" stroke-width="1.5"/>
-  <line x1="666" y1="224" x2="666" y2="248" stroke="#991b1b" stroke-width="2"/>
-  <text x="655" y="264" text-anchor="middle" fill="#991b1b" font-size="10" font-weight="700">LED 5 mm (+ / -)</text>
-  <text x="655" y="278" text-anchor="middle" fill="#475569" font-size="9">Corrente ≈ 6,4 mA</text>
-  <polyline points="666,236 696,236 696,336" fill="none" stroke="#0f172a" stroke-width="2"/>
-  <circle cx="696" cy="336" r="3.5" fill="#0f172a"/>
+  <!-- Circuito 2: LED + 220 (circuito enxuto sem botão externo) -->
+  <rect x="556" y="116" width="194" height="156" rx="8" fill="#fef2f2" stroke="#dc2626" stroke-width="1.3"/>
+  <text x="653" y="142" text-anchor="middle" fill="#991b1b" font-size="11" font-weight="700">LED VERMELHO (R1/R2/ACK)</text>
+  <line x1="512" y1="184" x2="572" y2="184" stroke="#dc2626" stroke-width="2.2"/>
+  <rect x="572" y="172" width="48" height="24" rx="3" fill="#e2e8f0" stroke="#475569" stroke-width="1.5"/>
+  <text x="596" y="188" text-anchor="middle" fill="#1e293b" font-size="9.5" font-weight="700">220 Ω</text>
+  <line x1="620" y1="184" x2="644" y2="184" stroke="#dc2626" stroke-width="2"/>
+  <polygon points="644,172 644,196 666,184" fill="#ef4444" stroke="#991b1b" stroke-width="1.5"/>
+  <line x1="666" y1="172" x2="666" y2="196" stroke="#991b1b" stroke-width="2"/>
+  <text x="655" y="220" text-anchor="middle" fill="#991b1b" font-size="10.5" font-weight="700">LED 5 mm (+ / -)</text>
+  <text x="655" y="236" text-anchor="middle" fill="#475569" font-size="9.5">Corrente ≈ 6,4 mA</text>
+  <text x="655" y="254" text-anchor="middle" fill="#64748b" font-size="8.8">(Troca de fase via App ou BOOT)</text>
+  <polyline points="666,184 712,184 712,336" fill="none" stroke="#0f172a" stroke-width="2"/>
+  <circle cx="712" cy="336" r="3.5" fill="#0f172a"/>
 </svg>
 `;
 }
@@ -218,7 +204,7 @@ export function diagramSequenceSvg() {
   <text x="532" y="102" text-anchor="middle" fill="#1e293b" font-size="10">2. Conecta por BLE e assina notificações</text>
 
   <line x1="108" y1="138" x2="386" y2="138" stroke="#1e293b" stroke-width="1.6" marker-end="url(#seqArrow)"/>
-  <text x="249" y="132" text-anchor="middle" fill="#1e293b" font-size="10">3. Aperto no botão (D27)</text>
+  <text x="249" y="132" text-anchor="middle" fill="#1e293b" font-size="10">3. Troca de fase (App ou BOOT)</text>
 
   <line x1="390" y1="164" x2="668" y2="164" stroke="#1e293b" stroke-width="1.6" marker-end="url(#seqArrow)"/>
   <text x="530" y="158" text-anchor="middle" fill="#1e293b" font-size="10" font-weight="700">4. TX Notify: dungeon_req (JSON + HMAC)</text>

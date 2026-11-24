@@ -440,7 +440,7 @@ const html = `<!doctype html>
 
 <div class="figure-box">
   ${diagramSchematicSvg()}
-  <div class="figure-caption">Figura 2 — Esquema elétrico ligando o ESP32 DevKit V1 ao LDR, botão e LED vermelho.</div>
+  <div class="figure-caption">Figura 2 — Esquema elétrico ligando o ESP32 DevKit V1 ao sensor de luz (LDR) e ao LED vermelho.</div>
 </div>
 
 <h3>3.1 Contas rápidas do circuito</h3>
