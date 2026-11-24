@@ -73,6 +73,19 @@ body,
   pointer-events: none;
 }
 
+.hud-left-stack {
+  pointer-events: auto;
+  display: flex;
+  align-items: flex-start;
+  gap: 8px;
+}
+
+.hud-bag-btn {
+  padding: 8px 12px;
+  font-size: 0.8rem;
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.45);
+}
+
 .hud-pill {
   pointer-events: auto;
   background: rgba(12, 16, 30, 0.86);
@@ -208,13 +221,13 @@ body,
   border: 2px solid rgba(130, 155, 215, 0.52);
 }
 
-/* Arco ergonomico estilo Soul Knight para o polegar direito */
+/* Controles de combate no canto inferior direito com espacamento amplo (zero toque acidental) */
 .fs-ctrl-arc {
   position: absolute;
-  bottom: max(14px, env(safe-area-inset-bottom));
-  right: max(18px, env(safe-area-inset-right));
-  width: 176px;
-  height: 154px;
+  bottom: max(18px, env(safe-area-inset-bottom));
+  right: max(22px, env(safe-area-inset-right));
+  width: 210px;
+  height: 176px;
   z-index: 25;
   pointer-events: none;
 }
@@ -229,8 +242,7 @@ body,
   color: #ffffff;
   cursor: pointer;
   touch-action: none;
-  box-shadow: 0 5px 16px rgba(0, 0, 0, 0.48);
-  transition: transform 0.06s ease;
+  box-shadow: 0 5px 14px rgba(0, 0, 0, 0.48);
 }
 
 .arc-btn:active {
@@ -251,30 +263,21 @@ body,
 }
 
 .arc-dash {
-  right: 92px;
+  right: 112px;
   bottom: 8px;
-  width: 58px;
-  height: 58px;
+  width: 60px;
+  height: 60px;
   border: 2px solid #99e9f2;
   background: radial-gradient(circle at 35% 30%, #22b8cf 0%, #0c8599 100%);
 }
 
 .arc-potion {
-  right: 72px;
-  bottom: 76px;
-  width: 48px;
-  height: 48px;
+  right: 16px;
+  bottom: 108px;
+  width: 50px;
+  height: 50px;
   border: 2px solid #8ce99a;
   background: radial-gradient(circle at 35% 30%, #37b24d 0%, #2b8a3e 100%);
-}
-
-.arc-bag {
-  right: 12px;
-  bottom: 92px;
-  width: 48px;
-  height: 48px;
-  border: 2px solid #ffe066;
-  background: radial-gradient(circle at 35% 30%, #f59f00 0%, #d9480f 100%);
 }
 
 .arc-count {
@@ -1352,7 +1355,20 @@ body,
 }
 
 @media (max-height: 440px) {
-  .hud-pill {
+  .hud-left-stack {
+  pointer-events: auto;
+  display: flex;
+  align-items: flex-start;
+  gap: 8px;
+}
+
+.hud-bag-btn {
+  padding: 8px 12px;
+  font-size: 0.8rem;
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.45);
+}
+
+.hud-pill {
     padding: 4px 9px;
   }
   .hud-center-info .hud-title {

@@ -1,9 +1,21 @@
 import crypto from 'node:crypto';
+import fs from 'node:fs';
 import http from 'node:http';
 import os from 'node:os';
+import path from 'node:path';
 
 const PORT = Number(process.env.PORT || 4175);
 const HOST = process.env.HOST || '0.0.0.0';
+const DIST_DIR = path.resolve(import.meta.dirname, '..', 'app', 'dist');
+const MIME_TYPES = {
+  '.html': 'text/html; charset=utf-8',
+  '.js': 'application/javascript; charset=utf-8',
+  '.css': 'text/css; charset=utf-8',
+  '.svg': 'image/svg+xml',
+  '.png': 'image/png',
+  '.json': 'application/json; charset=utf-8',
+  '.ico': 'image/x-icon',
+};
 
 // ============================================================
 // Mini-implementacao RFC 6455 WebSocket (zero dependencias npm)
@@ -165,11 +177,30 @@ function serializeRoomInfo(room) {
 
 const server = http.createServer((req, res) => {
   res.setHeader('Access-Control-Allow-Origin', '*');
-  if (req.url === '/health') {
+  const urlPath = (req.url || '/').split('?')[0];
+  if (urlPath === '/health') {
     res.writeHead(200, { 'Content-Type': 'application/json; charset=utf-8' });
     res.end(JSON.stringify({ ok: true, rooms: rooms.size, port: PORT }));
     return;
   }
+
+  // Serve o jogo web compilado (app/dist) para o amigo jogar direto pelo navegador sem VPN/APK!
+  const rel = urlPath === '/' ? 'index.html' : urlPath.replace(/^\/+/, '');
+  const safePath = path.normalize(path.join(DIST_DIR, rel));
+  if (safePath.startsWith(DIST_DIR) && fs.existsSync(safePath) && fs.statSync(safePath).isFile()) {
+    const ext = path.extname(safePath);
+    res.writeHead(200, { 'Content-Type': MIME_TYPES[ext] || 'application/octet-stream' });
+    fs.createReadStream(safePath).pipe(res);
+    return;
+  }
+
+  const indexHtml = path.join(DIST_DIR, 'index.html');
+  if (fs.existsSync(indexHtml)) {
+    res.writeHead(200, { 'Content-Type': 'text/html; charset=utf-8' });
+    fs.createReadStream(indexHtml).pipe(res);
+    return;
+  }
+
   res.writeHead(200, { 'Content-Type': 'text/plain; charset=utf-8' });
   res.end('DungeonLink Multiplayer Relay (CO-OP & X1) ativo.\n');
 });

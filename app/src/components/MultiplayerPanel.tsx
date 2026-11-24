@@ -1,6 +1,7 @@
 import React, { useState } from 'react';
 import {
   DEFAULT_VPN_MP_URL,
+  PUBLIC_FUNNEL_HTTP_URL,
   type MpRoomInfo,
   type MultiplayerMode,
 } from '../net/multiplayerClient';
@@ -40,9 +41,10 @@ export const MultiplayerPanel: React.FC<MultiplayerPanelProps> = ({
       <div className="card mp-card">
         <div className="card-header">
           <div>
-            <h3>Multiplayer por Código (VPN Tailscale / Rede Local)</h3>
+            <h3>Multiplayer Online (Internet Pública sem VPN · CO-OP &amp; X1)</h3>
             <p className="muted">
-              Mesma organização do Ruína Divina: crie uma sala com código de 4 letras e convide outro jogador pela VPN Tailscale ou Wi-Fi.
+              Funciona de qualquer casa/4G sem instalar VPN! Mande o link{' '}
+              <code>{PUBLIC_FUNNEL_HTTP_URL}</code> (ou o APK) + o código de 4 letras pro seu amigo.
             </p>
           </div>
           <span className={`pill ${status === 'in_room' ? 'pill-ok' : ''}`}>
@@ -83,24 +85,24 @@ export const MultiplayerPanel: React.FC<MultiplayerPanelProps> = ({
             <div className="mp-presets">
               <button
                 type="button"
-                className="btn btn-secondary"
-                onClick={() => setServerUrl('ws://100.100.204.22:4175')}
+                className="btn btn-primary"
+                onClick={() => setServerUrl('wss://vini-acer.taileff20f.ts.net:8443')}
               >
-                Usar Tailscale VPN (100.100.204.22)
+                Internet Pública (Sem VPN)
               </button>
               <button
                 type="button"
                 className="btn btn-secondary"
                 onClick={() => setServerUrl('ws://192.168.100.9:4175')}
               >
-                Usar Wi-Fi Local (192.168.100.9)
+                Wi-Fi Local
               </button>
               <button
                 type="button"
                 className="btn btn-secondary"
-                onClick={() => setServerUrl('ws://127.0.0.1:4175')}
+                onClick={() => setServerUrl('ws://100.100.204.22:4175')}
               >
-                Localhost (PC)
+                Tailscale VPN
               </button>
             </div>
 

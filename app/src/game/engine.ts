@@ -28,8 +28,8 @@ import {
   drawHero,
   drawPortalTile,
   getBiomeTileset,
+  getDarknessOverlay,
   getGlowStamp,
-  getLightHoleStamp,
 } from './pixelSprites';
 import type { MultiplayerMode, RemoteHeroState } from '../net/multiplayerClient';
 import { soundEngine } from './sound';
@@ -192,7 +192,6 @@ export class DungeonGameEngine {
   private attackTimerMs = 0;
   private attackDurationMs = 175;
   private attackCooldownMs = 0;
-  private hitstopMs = 0;
   private shakeTimerMs = 0;
   private shakeIntensity = 0;
   private roomFlashAlpha = 0;
@@ -211,8 +210,6 @@ export class DungeonGameEngine {
   // Cache offscreen para o mapa estatico (1 drawImage por frame -> 60fps liso no Android!)
   private roomLayerCanvas: HTMLCanvasElement | null = null;
   private roomLayerDirty = true;
-  private lightCanvas: HTMLCanvasElement | null = null;
-  private lightCtx: CanvasRenderingContext2D | null = null;
   private hintText = 'Sala 1/3: Derrote os guardas e abra o baú dourado!';
 
   constructor(private readonly callbacks: EngineCallbacks) {
@@ -451,7 +448,6 @@ export class DungeonGameEngine {
     this.player.aimAngle = this.localSlot === 2 && this.mpMode === 'pvp' ? Math.PI : 0;
     this.attackTimerMs = 0;
     this.attackCooldownMs = 0;
-    this.hitstopMs = 0;
     this.shakeTimerMs = 0;
     this.pvpRespawnTimerMs = 0;
     this.roomFlashAlpha = 0.35;
@@ -800,8 +796,8 @@ export class DungeonGameEngine {
     const eCy = enemy.y + enemy.h / 2;
     this.spawnBurst(eCx, eCy, slow ? '#66d9e8' : this.dungeon.accentColor, 9, 110);
     this.spawnFloatingText(eCx, eCy - 14, `-${amount}`, slow ? '#66d9e8' : amount >= 3 ? '#ff922b' : '#ffd43b');
-    this.addShake(amount >= 2 ? 4 : 2.2, 95);
-    this.hitstopMs = amount >= 3 ? 24 : 12;
+    this.addShake(amount >= 2 ? 3.2 : 1.8, 80);
+    // Sem hitstop para evitar sensacao de travadinha durante combate rapido no celular
     soundEngine.hitEnemy();
 
     if (broadcast && this.mpMode === 'coop') {
@@ -1122,11 +1118,6 @@ export class DungeonGameEngine {
 
     if (this.status !== 'playing') return;
 
-    if (this.hitstopMs > 0) {
-      this.hitstopMs = Math.max(0, this.hitstopMs - dt * 1000);
-      return;
-    }
-
     this.elapsedSec = Math.floor((Date.now() - this.startTimeMs) / 1000);
     if (this.player.invulnMs > 0) this.player.invulnMs = Math.max(0, this.player.invulnMs - dt * 1000);
     if (this.player.hurtMs > 0) this.player.hurtMs = Math.max(0, this.player.hurtMs - dt * 1000);
@@ -1357,16 +1348,6 @@ export class DungeonGameEngine {
     }
   }
 
-  private ensureLightCanvas(): CanvasRenderingContext2D {
-    if (!this.lightCanvas) {
-      this.lightCanvas = document.createElement('canvas');
-      this.lightCanvas.width = CANVAS_WIDTH;
-      this.lightCanvas.height = CANVAS_HEIGHT;
-      this.lightCtx = this.lightCanvas.getContext('2d')!;
-    }
-    return this.lightCtx!;
-  }
-
   render(ctx: CanvasRenderingContext2D): void {
     if (this.roomLayerDirty || !this.roomLayerCanvas) {
       this.bakeStaticRoomLayer();
@@ -1530,30 +1511,23 @@ export class DungeonGameEngine {
     }
     ctx.globalAlpha = 1;
 
-    // 6. Iluminacao dinamica ultra-leve no modo escuro
+    // 6. Iluminacao dinamica ultra-leve no modo escuro (1 unico drawImage pre-renderizado -> 0 travadas no Android!)
     if (this.lightLerp > 0.02) {
-      const lctx = this.ensureLightCanvas();
-      const hole = getLightHoleStamp();
       const heroCx = this.player.x + this.player.w / 2;
       const heroCy = this.player.y + this.player.h / 2;
-      const heroR = (weapon.id === 'flame_staff' ? 138 : 114) + Math.sin(this.animTime * 10) * 3;
+      const heroR = weapon.id === 'flame_staff' ? 140 : 115;
+      const darkMask = getDarknessOverlay(heroR);
 
-      lctx.globalCompositeOperation = 'source-over';
-      lctx.clearRect(0, 0, CANVAS_WIDTH, CANVAS_HEIGHT);
-      lctx.fillStyle = `rgba(6, 7, 16, ${(0.84 * this.lightLerp).toFixed(3)})`;
-      lctx.fillRect(0, 0, CANVAS_WIDTH, CANVAS_HEIGHT);
-
-      lctx.globalCompositeOperation = 'destination-out';
-      lctx.drawImage(hole, heroCx - heroR, heroCy - heroR, heroR * 2, heroR * 2);
-      for (const ls of lightSources) {
-        lctx.drawImage(hole, ls.x - ls.r, ls.y - ls.r, ls.r * 2, ls.r * 2);
-      }
-
-      ctx.drawImage(this.lightCanvas!, 0, 0);
-      const warm = getGlowStamp('rgba(255, 190, 92, 0.22)');
       ctx.save();
       ctx.globalAlpha = this.lightLerp;
-      ctx.drawImage(warm, heroCx - heroR * 0.85, heroCy - heroR * 0.85, heroR * 1.7, heroR * 1.7);
+      ctx.drawImage(darkMask, Math.round(heroCx - 512), Math.round(heroCy - 320));
+      // Brilho quente da tocha + luz extra nos braseiros/bau/portal
+      const warm = getGlowStamp('rgba(255, 190, 92, 0.24)');
+      ctx.drawImage(warm, Math.round(heroCx - heroR * 0.8), Math.round(heroCy - heroR * 0.8), Math.round(heroR * 1.6), Math.round(heroR * 1.6));
+      for (const ls of lightSources) {
+        const g = getGlowStamp(pal.flameGlow);
+        ctx.drawImage(g, Math.round(ls.x - ls.r * 0.65), Math.round(ls.y - ls.r * 0.65), Math.round(ls.r * 1.3), Math.round(ls.r * 1.3));
+      }
       ctx.restore();
     }
 

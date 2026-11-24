@@ -135,7 +135,7 @@ export const GameCanvas: React.FC<GameCanvasProps> = ({
 
       const canvas = canvasRef.current;
       if (canvas) {
-        const ctx = canvas.getContext('2d');
+        const ctx = canvas.getContext('2d', { alpha: false });
         if (ctx) {
           ctx.imageSmoothingEnabled = false;
           engine.render(ctx);
@@ -196,34 +196,47 @@ export const GameCanvas: React.FC<GameCanvasProps> = ({
 
       {/* HUD Flutuante Superior (sem backdrop-filter para 60fps constantes no Android) */}
       <div className="fs-hud-top">
-        {/* Topo Esquerdo: Vida, Escudo, Arma e Ouro */}
-        <div className="hud-pill hud-vitals">
-          <div className="vitals-row">
-            <span className="hearts" aria-label={`Vida ${snapshot.playerHp} de ${snapshot.playerMaxHp}`}>
-              {Array.from({ length: snapshot.playerMaxHp }, (_, idx) => (
-                <span key={idx} className={idx < snapshot.playerHp ? 'heart-on' : 'heart-off'}>
-                  ♥
-                </span>
-              ))}
-            </span>
-            <span className="shields" aria-label={`Escudo ${snapshot.playerShield} de ${snapshot.playerMaxShield}`}>
-              {Array.from({ length: snapshot.playerMaxShield }, (_, idx) => (
-                <span key={idx} className={idx < snapshot.playerShield ? 'shield-on' : 'shield-off'}>
-                  ◆
-                </span>
-              ))}
-            </span>
-          </div>
-          <div className="hud-subline">
-            <span style={{ color: activeWeapon.color, fontWeight: 700 }}>{activeWeapon.name}</span>
-            <span>·</span>
-            <span className="gold-txt">{inv.gold}G</span>
-            {activeRelic.id !== 'none' && (
-              <span className="relic-mini" style={{ color: activeRelic.color }}>
-                · {activeRelic.name}
+        {/* Topo Esquerdo: Vida, Escudo, Arma, Ouro e botao Mochila longe do combate */}
+        <div className="hud-left-stack">
+          <div className="hud-pill hud-vitals">
+            <div className="vitals-row">
+              <span className="hearts" aria-label={`Vida ${snapshot.playerHp} de ${snapshot.playerMaxHp}`}>
+                {Array.from({ length: snapshot.playerMaxHp }, (_, idx) => (
+                  <span key={idx} className={idx < snapshot.playerHp ? 'heart-on' : 'heart-off'}>
+                    ♥
+                  </span>
+                ))}
               </span>
-            )}
+              <span className="shields" aria-label={`Escudo ${snapshot.playerShield} de ${snapshot.playerMaxShield}`}>
+                {Array.from({ length: snapshot.playerMaxShield }, (_, idx) => (
+                  <span key={idx} className={idx < snapshot.playerShield ? 'shield-on' : 'shield-off'}>
+                    ◆
+                  </span>
+                ))}
+              </span>
+            </div>
+            <div className="hud-subline">
+              <span style={{ color: activeWeapon.color, fontWeight: 700 }}>{activeWeapon.name}</span>
+              <span>·</span>
+              <span className="gold-txt">{inv.gold}G</span>
+              {activeRelic.id !== 'none' && (
+                <span className="relic-mini" style={{ color: activeRelic.color }}>
+                  · {activeRelic.name}
+                </span>
+              )}
+            </div>
           </div>
+          <button
+            type="button"
+            className="btn icon-pill-btn bag-btn hud-bag-btn"
+            aria-label="Abrir Mochila"
+            onClick={() => {
+              setInvFeedback('');
+              setInventoryOpen(true);
+            }}
+          >
+            <IconBag size={16} /> Mochila
+          </button>
         </div>
 
         {/* Topo Centro: Dungeon / Sala / Placar X1 */}
@@ -330,20 +343,8 @@ export const GameCanvas: React.FC<GameCanvasProps> = ({
         </div>
       </div>
 
-      {/* Controle Inferior Direito em Arco Ergonomico estilo Soul Knight */}
+      {/* Controle Inferior Direito espacado e ergonomico (Atacar, Dash e Pocao) */}
       <div className="fs-ctrl-arc">
-        <button
-          type="button"
-          className="arc-btn arc-bag"
-          aria-label="Abrir Mochila"
-          onClick={() => {
-            setInvFeedback('');
-            setInventoryOpen(true);
-          }}
-        >
-          <IconBag size={22} />
-        </button>
-
         <button
           type="button"
           className="arc-btn arc-potion"
@@ -351,7 +352,7 @@ export const GameCanvas: React.FC<GameCanvasProps> = ({
           disabled={inv.potions <= 0 || snapshot.playerHp >= snapshot.playerMaxHp}
           onClick={() => engine.usePotion()}
         >
-          <IconPotion size={21} />
+          <IconPotion size={22} />
           <span className="arc-count">{inv.potions}</span>
         </button>
 

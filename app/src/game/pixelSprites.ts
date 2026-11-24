@@ -522,6 +522,26 @@ export function getBiomeTileset(biome: BiomeKind): BiomeTileset {
 
 const glowStampCache = new Map<string, HTMLCanvasElement>();
 let lightHoleStamp: HTMLCanvasElement | null = null;
+const darkOverlayCache = new Map<number, HTMLCanvasElement>();
+
+export function getDarknessOverlay(radius: number): HTMLCanvasElement {
+  const key = Math.round(radius / 10) * 10;
+  const cached = darkOverlayCache.get(key);
+  if (cached) return cached;
+  // Pre-renderiza mascara de escuridao 1024x640 uma unica vez -> 1 drawImage por frame (0ms lag no Android!)
+  const [c, ctx] = makeOffscreen(1024, 640);
+  const cx = 512;
+  const cy = 320;
+  const g = ctx.createRadialGradient(cx, cy, key * 0.25, cx, cy, key * 1.45);
+  g.addColorStop(0, 'rgba(6, 7, 16, 0)');
+  g.addColorStop(0.55, 'rgba(6, 7, 16, 0.35)');
+  g.addColorStop(0.85, 'rgba(6, 7, 16, 0.78)');
+  g.addColorStop(1, 'rgba(6, 7, 16, 0.88)');
+  ctx.fillStyle = g;
+  ctx.fillRect(0, 0, 1024, 640);
+  darkOverlayCache.set(key, c);
+  return c;
+}
 
 export function getGlowStamp(color: string): HTMLCanvasElement {
   const cached = glowStampCache.get(color);

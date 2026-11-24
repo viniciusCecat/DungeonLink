@@ -48,7 +48,8 @@ export interface MpClientCallbacks {
   onPeerLeft: () => void;
 }
 
-export const DEFAULT_VPN_MP_URL = 'ws://100.100.204.22:4175';
+export const PUBLIC_FUNNEL_HTTP_URL = 'https://vini-acer.taileff20f.ts.net:8443';
+export const DEFAULT_VPN_MP_URL = 'wss://vini-acer.taileff20f.ts.net:8443';
 
 export class DungeonMultiplayerClient {
   private ws: WebSocket | null = null;
