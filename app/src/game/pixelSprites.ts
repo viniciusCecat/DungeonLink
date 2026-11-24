@@ -1,4 +1,5 @@
 import type { BiomeKind, EnemyKind } from './dungeons';
+import type { WeaponId } from './items';
 
 /**
  * Banco procedural de texturas e sprites em pixel-art estilo Soul Knight
@@ -428,6 +429,35 @@ export function getBiomeTileset(biome: BiomeKind): BiomeTileset {
   return ts;
 }
 
+const glowStampCache = new Map<string, HTMLCanvasElement>();
+let lightHoleStamp: HTMLCanvasElement | null = null;
+
+export function getGlowStamp(color: string): HTMLCanvasElement {
+  const cached = glowStampCache.get(color);
+  if (cached) return cached;
+  const [c, ctx] = makeOffscreen(64, 64);
+  const g = ctx.createRadialGradient(32, 32, 4, 32, 32, 32);
+  g.addColorStop(0, color);
+  g.addColorStop(1, 'rgba(0,0,0,0)');
+  ctx.fillStyle = g;
+  ctx.fillRect(0, 0, 64, 64);
+  glowStampCache.set(color, c);
+  return c;
+}
+
+export function getLightHoleStamp(): HTMLCanvasElement {
+  if (lightHoleStamp) return lightHoleStamp;
+  const [c, ctx] = makeOffscreen(128, 128);
+  const g = ctx.createRadialGradient(64, 64, 8, 64, 64, 64);
+  g.addColorStop(0, 'rgba(0,0,0,1)');
+  g.addColorStop(0.62, 'rgba(0,0,0,0.68)');
+  g.addColorStop(1, 'rgba(0,0,0,0)');
+  ctx.fillStyle = g;
+  ctx.fillRect(0, 0, 128, 128);
+  lightHoleStamp = c;
+  return c;
+}
+
 export function drawBrazier(
   ctx: CanvasRenderingContext2D,
   x: number,
@@ -454,14 +484,52 @@ export function drawBrazier(
   ctx.fillStyle = pal.flameCore;
   ctx.fillRect(x + 13 + sway, y + 8 - Math.floor(tall / 2), 6, 7);
 
-  // Glow quente suave
-  const grad = ctx.createRadialGradient(x + 16, y + 12, 3, x + 16, y + 12, 26);
-  grad.addColorStop(0, pal.flameGlow);
-  grad.addColorStop(1, 'rgba(0,0,0,0)');
-  ctx.fillStyle = grad;
-  ctx.beginPath();
-  ctx.arc(x + 16, y + 12, 26, 0, Math.PI * 2);
-  ctx.fill();
+  // Glow pre-renderizado (zero alocacao de gradiente por frame -> 60fps liso no Android)
+  const glow = getGlowStamp(pal.flameGlow);
+  ctx.drawImage(glow, x - 12, y - 16, 56, 56);
+}
+
+export function drawChestTile(
+  ctx: CanvasRenderingContext2D,
+  x: number,
+  y: number,
+  opened: boolean,
+  t: number,
+): void {
+  // Sombra
+  ctx.fillStyle = 'rgba(0,0,0,0.38)';
+  ctx.fillRect(x + 4, y + 24, 24, 5);
+
+  if (opened) {
+    ctx.fillStyle = '#12101a';
+    ctx.fillRect(x + 4, y + 9, 24, 18);
+    ctx.fillStyle = '#5c3d24';
+    ctx.fillRect(x + 6, y + 11, 20, 14);
+    ctx.fillStyle = '#2b1d12';
+    ctx.fillRect(x + 8, y + 13, 16, 6);
+    ctx.fillStyle = '#fab005';
+    ctx.fillRect(x + 6, y + 18, 20, 2);
+    return;
+  }
+
+  const bounce = Math.sin(t * 5) > 0.75 ? -1 : 0;
+  const glow = getGlowStamp('rgba(255, 212, 59, 0.36)');
+  ctx.drawImage(glow, x - 10, y - 10 + bounce, 52, 52);
+
+  // Bau fechado dourado estilo Soul Knight
+  ctx.fillStyle = '#12101a';
+  ctx.fillRect(x + 4, y + 7 + bounce, 24, 20);
+  ctx.fillStyle = '#8d5524';
+  ctx.fillRect(x + 6, y + 9 + bounce, 20, 16);
+  ctx.fillStyle = '#b57035';
+  ctx.fillRect(x + 6, y + 9 + bounce, 20, 6);
+  // Faixas douradas e fechadura
+  ctx.fillStyle = '#fcc419';
+  ctx.fillRect(x + 6, y + 14 + bounce, 20, 3);
+  ctx.fillRect(x + 9, y + 9 + bounce, 2, 16);
+  ctx.fillRect(x + 21, y + 9 + bounce, 2, 16);
+  ctx.fillStyle = '#fff3bf';
+  ctx.fillRect(x + 14, y + 13 + bounce, 4, 5);
 }
 
 export function drawDoorTile(
@@ -505,17 +573,18 @@ export function drawPortalTile(
     return;
   }
 
-  // Portal magico giratorio estilo Soul Knight
+  // Portal magico giratorio estilo Soul Knight (usando glow pre-renderizado)
   const cx = x + 16;
   const cy = y + 16;
-  const grad = ctx.createRadialGradient(cx, cy, 2, cx, cy, 22);
-  grad.addColorStop(0, '#ffffff');
-  grad.addColorStop(0.35, pal.portalB);
-  grad.addColorStop(0.75, pal.portalA);
-  grad.addColorStop(1, 'rgba(0,0,0,0)');
-  ctx.fillStyle = grad;
+  const glow = getGlowStamp(pal.portalA);
+  ctx.drawImage(glow, x - 12, y - 12, 56, 56);
+  ctx.fillStyle = pal.portalB;
   ctx.beginPath();
-  ctx.arc(cx, cy, 22, 0, Math.PI * 2);
+  ctx.arc(cx, cy, 10, 0, Math.PI * 2);
+  ctx.fill();
+  ctx.fillStyle = '#ffffff';
+  ctx.beginPath();
+  ctx.arc(cx, cy, 5, 0, Math.PI * 2);
   ctx.fill();
 
   ctx.save();
@@ -541,6 +610,8 @@ export function drawHero(
   dashActive: boolean,
   attackProgress: number, // 0 = idle, >0 = swinging (0..1)
   t: number,
+  weaponId: WeaponId = 'rune_sword',
+  armorTint = '#3b5bdb',
 ): void {
   const flipX = Math.cos(aimAngle) < 0;
   const frame = moving && Math.floor(t * 10) % 2 === 1 ? HERO_FRAME_1 : HERO_FRAME_0;
@@ -564,37 +635,85 @@ export function drawHero(
           K: '#1a1d2b', // visor escuro
           C: '#74c0fc', // olhos brilhantes no visor
           S: '#ffd8a8', // queixo
-          B: '#3b5bdb', // armadura azul real
+          B: armorTint, // armadura equipada!
           Y: '#fcc419', // cinto/emblema dourado
-          D: '#364fc7', // pernas
+          D: armorTint, // pernas combinando com armadura
         };
 
   drawMatrix(ctx, frame, pal, Math.round(x - 5), Math.round(y - 6 + bob), 2, flipX);
 
-  // Espada runica segurada na mao e rotacionada na direcao da mira
+  // Arma equipada na mao e rotacionada na direcao da mira
   const handX = x + 11 + (flipX ? -4 : 4);
   const handY = y + 13 + bob;
+  const swingAmp = weaponId === 'elf_bow' || weaponId === 'flame_staff' ? 0.35 : 1.45;
   const swingOffset =
-    attackProgress > 0 ? Math.sin(attackProgress * Math.PI) * (flipX ? -1.4 : 1.4) : 0;
+    attackProgress > 0 ? Math.sin(attackProgress * Math.PI) * (flipX ? -swingAmp : swingAmp) : 0;
 
   ctx.save();
   ctx.translate(handX, handY);
   ctx.rotate(aimAngle + swingOffset);
-  // Cabo dourado
-  ctx.fillStyle = '#12101a';
-  ctx.fillRect(-2, -3, 6, 6);
-  ctx.fillStyle = '#fcc419';
-  ctx.fillRect(0, -2, 3, 4);
-  // Guarda
-  ctx.fillStyle = '#fab005';
-  ctx.fillRect(3, -5, 3, 10);
-  // Lamina de cristal azul/prata
-  ctx.fillStyle = '#12101a';
-  ctx.fillRect(6, -3, 15, 6);
-  ctx.fillStyle = '#e7f5ff';
-  ctx.fillRect(6, -2, 13, 2);
-  ctx.fillStyle = '#4dabf7';
-  ctx.fillRect(6, 0, 13, 2);
+
+  if (weaponId === 'elf_bow') {
+    // Arco Elfico verde/madeira
+    ctx.strokeStyle = '#12101a';
+    ctx.lineWidth = 4;
+    ctx.beginPath();
+    ctx.arc(4, 0, 10, -1.15, 1.15);
+    ctx.stroke();
+    ctx.strokeStyle = '#9c6644';
+    ctx.lineWidth = 2;
+    ctx.beginPath();
+    ctx.arc(4, 0, 10, -1.15, 1.15);
+    ctx.stroke();
+    ctx.strokeStyle = '#b2f2bb';
+    ctx.lineWidth = 1.2;
+    ctx.beginPath();
+    ctx.moveTo(8, -9);
+    ctx.lineTo(8, 9);
+    ctx.stroke();
+    ctx.fillStyle = '#51cf66';
+    ctx.fillRect(6, -1, 12, 2);
+  } else if (weaponId === 'flame_staff') {
+    // Cajado Flamejante
+    ctx.fillStyle = '#12101a';
+    ctx.fillRect(-3, -2, 18, 5);
+    ctx.fillStyle = '#7950f2';
+    ctx.fillRect(-2, -1, 16, 3);
+    ctx.fillStyle = '#ff6b6b';
+    ctx.beginPath();
+    ctx.arc(16, 0, 5, 0, Math.PI * 2);
+    ctx.fill();
+    ctx.fillStyle = '#fff3bf';
+    ctx.beginPath();
+    ctx.arc(16, 0, 2.5, 0, Math.PI * 2);
+    ctx.fill();
+  } else if (weaponId === 'forge_axe') {
+    // Machado Pesado da Forja
+    ctx.fillStyle = '#12101a';
+    ctx.fillRect(-3, -2, 18, 5);
+    ctx.fillStyle = '#8d5524';
+    ctx.fillRect(-2, -1, 16, 3);
+    ctx.fillStyle = '#12101a';
+    ctx.fillRect(10, -9, 10, 18);
+    ctx.fillStyle = '#ff6b6b';
+    ctx.fillRect(12, -7, 6, 14);
+    ctx.fillStyle = '#ffd43b';
+    ctx.fillRect(16, -6, 2, 12);
+  } else {
+    // Espada Runica padrao
+    ctx.fillStyle = '#12101a';
+    ctx.fillRect(-2, -3, 6, 6);
+    ctx.fillStyle = '#fcc419';
+    ctx.fillRect(0, -2, 3, 4);
+    ctx.fillStyle = '#fab005';
+    ctx.fillRect(3, -5, 3, 10);
+    ctx.fillStyle = '#12101a';
+    ctx.fillRect(6, -3, 15, 6);
+    ctx.fillStyle = '#e7f5ff';
+    ctx.fillRect(6, -2, 13, 2);
+    ctx.fillStyle = '#4dabf7';
+    ctx.fillRect(6, 0, 13, 2);
+  }
   ctx.restore();
 }
 

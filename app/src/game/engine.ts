@@ -9,13 +9,24 @@ import {
   type DungeonDefinition,
 } from './dungeons';
 import {
+  ARMORS,
+  WEAPONS,
+  createInitialInventory,
+  type ArmorId,
+  type InventoryState,
+  type WeaponId,
+} from './items';
+import {
   BIOME_PALETTES,
   drawBrazier,
+  drawChestTile,
   drawDoorTile,
   drawEnemy,
   drawHero,
   drawPortalTile,
   getBiomeTileset,
+  getGlowStamp,
+  getLightHoleStamp,
 } from './pixelSprites';
 import { soundEngine } from './sound';
 
@@ -66,6 +77,8 @@ export interface GameSnapshot {
   room: 1 | 2;
   playerHp: number;
   playerMaxHp: number;
+  playerShield: number;
+  playerMaxShield: number;
   enemyName: string;
   enemyHp: number;
   enemyMaxHp: number;
@@ -73,6 +86,7 @@ export interface GameSnapshot {
   status: 'idle' | 'playing' | 'victory' | 'defeat';
   elapsedSec: number;
   hintText: string;
+  inventory: InventoryState;
 }
 
 export interface InputState {
@@ -95,6 +109,9 @@ export class DungeonGameEngine {
   public light: LightState = 'bright';
   public status: 'idle' | 'playing' | 'victory' | 'defeat' = 'playing';
 
+  private inventory: InventoryState = createInitialInventory();
+  private chestOpenedInDungeon = false;
+
   private player = {
     x: 64,
     y: 128,
@@ -104,12 +121,17 @@ export class DungeonGameEngine {
     vy: 0,
     hp: 6,
     maxHp: 6,
+    shield: 2,
+    maxShield: 2,
+    shieldRegenDelayMs: 0,
+    shieldRegenTickMs: 0,
     aimAngle: 0,
     moving: false,
     invulnMs: 0,
     hurtMs: 0,
     dashMs: 0,
     dashCdMs: 0,
+    dashMaxCdMs: 680,
     dashDirX: 1,
     dashDirY: 0,
     stepDustTimer: 0,
@@ -149,7 +171,7 @@ export class DungeonGameEngine {
   private ambientMotes: Array<{ x: number; y: number; speed: number; phase: number; size: number }> = [];
   private lightCanvas: HTMLCanvasElement | null = null;
   private lightCtx: CanvasRenderingContext2D | null = null;
-  private hintText = 'Sala 1/2: Atravesse a masmorra e entre na porta dourada ->';
+  private hintText = 'Sala 1/2: Abra o baú dourado e avance até a porta →';
 
   constructor(
     private readonly callbacks: {
@@ -158,7 +180,7 @@ export class DungeonGameEngine {
       onStateChange: (snapshot: GameSnapshot) => void;
     },
   ) {
-    for (let i = 0; i < 22; i++) {
+    for (let i = 0; i < 18; i++) {
       this.ambientMotes.push({
         x: Math.random() * CANVAS_WIDTH,
         y: Math.random() * CANVAS_HEIGHT,
@@ -167,11 +189,97 @@ export class DungeonGameEngine {
         size: Math.random() > 0.65 ? 3 : 2,
       });
     }
+    this.syncArmorStats(true);
     this.loadDungeon(1, 'bright', false);
   }
 
   setLightState(light: LightState): void {
     this.light = light;
+  }
+
+  private syncArmorStats(refillShield = false): void {
+    const armor = ARMORS[this.inventory.equippedArmor];
+    this.player.maxShield = armor.maxShield;
+    this.player.dashMaxCdMs = armor.dashCdMs;
+    if (refillShield) {
+      this.player.shield = armor.maxShield;
+    } else {
+      this.player.shield = Math.min(this.player.shield, armor.maxShield);
+    }
+  }
+
+  buyOrEquipWeapon(id: WeaponId): { ok: boolean; msg: string } {
+    const def = WEAPONS[id];
+    if (this.inventory.unlockedWeapons.includes(id)) {
+      this.inventory.equippedWeapon = id;
+      soundEngine.equip();
+      this.spawnFloatingText(
+        this.player.x + 10,
+        this.player.y - 10,
+        `${def.name}!`,
+        def.color,
+      );
+      this.emitSnapshot();
+      return { ok: true, msg: `${def.name} equipada!` };
+    }
+    if (this.inventory.gold < def.cost) {
+      return { ok: false, msg: `Ouro insuficiente (precisa de ${def.cost}).` };
+    }
+    this.inventory.gold -= def.cost;
+    this.inventory.unlockedWeapons = [...this.inventory.unlockedWeapons, id];
+    this.inventory.equippedWeapon = id;
+    soundEngine.chestOpen();
+    this.emitSnapshot();
+    return { ok: true, msg: `${def.name} forjada e equipada!` };
+  }
+
+  buyOrEquipArmor(id: ArmorId): { ok: boolean; msg: string } {
+    const def = ARMORS[id];
+    if (this.inventory.unlockedArmors.includes(id)) {
+      this.inventory.equippedArmor = id;
+      this.syncArmorStats(true);
+      soundEngine.equip();
+      this.emitSnapshot();
+      return { ok: true, msg: `${def.name} equipada!` };
+    }
+    if (this.inventory.gold < def.cost) {
+      return { ok: false, msg: `Ouro insuficiente (precisa de ${def.cost}).` };
+    }
+    this.inventory.gold -= def.cost;
+    this.inventory.unlockedArmors = [...this.inventory.unlockedArmors, id];
+    this.inventory.equippedArmor = id;
+    this.syncArmorStats(true);
+    soundEngine.chestOpen();
+    this.emitSnapshot();
+    return { ok: true, msg: `${def.name} forjada e equipada!` };
+  }
+
+  buyPotion(): { ok: boolean; msg: string } {
+    const cost = 12;
+    if (this.inventory.gold < cost) {
+      return { ok: false, msg: `Ouro insuficiente (poção custa ${cost}).` };
+    }
+    this.inventory.gold -= cost;
+    this.inventory.potions += 1;
+    soundEngine.equip();
+    this.emitSnapshot();
+    return { ok: true, msg: '+1 Poção de Vida comprada!' };
+  }
+
+  usePotion(): boolean {
+    if (this.status !== 'playing' || this.inventory.potions <= 0 || this.player.hp >= this.player.maxHp) {
+      return false;
+    }
+    this.inventory.potions -= 1;
+    const healed = Math.min(2, this.player.maxHp - this.player.hp);
+    this.player.hp += healed;
+    const pCx = this.player.x + this.player.w / 2;
+    const pCy = this.player.y + this.player.h / 2;
+    this.spawnBurst(pCx, pCy, '#51cf66', 12, 95);
+    this.spawnFloatingText(pCx, pCy - 14, `+${healed} HP`, '#69db7c');
+    soundEngine.heal();
+    this.emitSnapshot();
+    return true;
   }
 
   loadDungeon(dungeonId: number, light: LightState, playChime = true): void {
@@ -180,7 +288,9 @@ export class DungeonGameEngine {
     this.lightLerp = light === 'dark' ? 1 : 0;
     this.room = 1;
     this.status = 'playing';
+    this.chestOpenedInDungeon = false;
     this.player.hp = this.player.maxHp;
+    this.syncArmorStats(true);
     this.player.vx = 0;
     this.player.vy = 0;
     this.player.invulnMs = 0;
@@ -192,7 +302,7 @@ export class DungeonGameEngine {
     this.attackCooldownMs = 0;
     this.hitstopMs = 0;
     this.shakeTimerMs = 0;
-    this.roomFlashAlpha = 0.45;
+    this.roomFlashAlpha = 0.4;
     this.portalUnlocked = false;
     this.particles = [];
     this.floatingTexts = [];
@@ -218,6 +328,8 @@ export class DungeonGameEngine {
       room: this.room,
       playerHp: this.player.hp,
       playerMaxHp: this.player.maxHp,
+      playerShield: this.player.shield,
+      playerMaxShield: this.player.maxShield,
       enemyName: this.dungeon.enemyName,
       enemyHp: this.enemy.alive ? this.enemy.hp : 0,
       enemyMaxHp: this.dungeon.enemyMaxHp,
@@ -225,6 +337,11 @@ export class DungeonGameEngine {
       status: this.status,
       elapsedSec: this.elapsedSec,
       hintText: this.hintText,
+      inventory: {
+        ...this.inventory,
+        unlockedWeapons: [...this.inventory.unlockedWeapons],
+        unlockedArmors: [...this.inventory.unlockedArmors],
+      },
     };
   }
 
@@ -236,7 +353,7 @@ export class DungeonGameEngine {
     this.room = room;
     this.projectiles = [];
     this.dashGhosts = [];
-    this.roomFlashAlpha = 0.4;
+    this.roomFlashAlpha = 0.35;
     const map = this.getCurrentMap();
     this.enemy.alive = false;
     this.enemy.hp = this.dungeon.enemyMaxHp;
@@ -262,10 +379,10 @@ export class DungeonGameEngine {
 
     if (room === 1) {
       this.portalUnlocked = false;
-      this.hintText = 'Sala 1/2: Deslize o analógico até a porta dourada →';
+      this.hintText = 'Sala 1/2: Pegue o baú dourado e deslize até a porta →';
     } else {
       this.portalUnlocked = false;
-      this.hintText = `Sala 2/2: Derrote ${this.dungeon.enemyName} (Espada bloqueia tiros!)`;
+      this.hintText = `Sala 2/2: Derrote ${this.dungeon.enemyName} (Espada rebate tiros!)`;
     }
   }
 
@@ -289,20 +406,48 @@ export class DungeonGameEngine {
     return false;
   }
 
-  // Movimento com corner-sliding suave estilo Soul Knight (nao prende em quinas!)
+  // Movimento seguro com corner-sliding (NUNCA prende ou atravessa quinas!)
   private moveWithSlide(box: EntityBox, dx: number, dy: number): void {
+    // Seguranca extra: se por algum motivo estiver sobreposto a parede, centraliza no tile livre mais proximo
+    if (this.collidesWithMap(box.x, box.y, box.w, box.h)) {
+      const baseC = Math.max(1, Math.min(GRID_COLS - 2, Math.floor((box.x + box.w / 2) / TILE_SIZE)));
+      const baseR = Math.max(1, Math.min(GRID_ROWS - 2, Math.floor((box.y + box.h / 2) / TILE_SIZE)));
+      for (let rad = 0; rad <= 3; rad++) {
+        for (let dr = -rad; dr <= rad; dr++) {
+          for (let dc = -rad; dc <= rad; dc++) {
+            const tx = (baseC + dc) * TILE_SIZE + 6;
+            const ty = (baseR + dr) * TILE_SIZE + 6;
+            if (!this.collidesWithMap(tx, ty, box.w, box.h)) {
+              box.x = tx;
+              box.y = ty;
+              rad = 99;
+              dr = 99;
+              break;
+            }
+          }
+        }
+      }
+    }
+
     if (dx !== 0) {
       const nx = box.x + dx;
       if (!this.collidesWithMap(nx, box.y, box.w, box.h)) {
         box.x = nx;
       } else {
-        for (let nudge = 1; nudge <= 7; nudge++) {
-          if (!this.collidesWithMap(nx, box.y - nudge, box.w, box.h)) {
-            box.y -= Math.min(nudge, Math.abs(dx) * 0.9);
+        for (let nudge = 1; nudge <= 6; nudge++) {
+          const step = Math.min(nudge, Math.abs(dx) * 0.85);
+          if (
+            !this.collidesWithMap(nx, box.y - nudge, box.w, box.h) &&
+            !this.collidesWithMap(box.x, box.y - step, box.w, box.h)
+          ) {
+            box.y -= step;
             break;
           }
-          if (!this.collidesWithMap(nx, box.y + nudge, box.w, box.h)) {
-            box.y += Math.min(nudge, Math.abs(dx) * 0.9);
+          if (
+            !this.collidesWithMap(nx, box.y + nudge, box.w, box.h) &&
+            !this.collidesWithMap(box.x, box.y + step, box.w, box.h)
+          ) {
+            box.y += step;
             break;
           }
         }
@@ -314,18 +459,55 @@ export class DungeonGameEngine {
       if (!this.collidesWithMap(box.x, ny, box.w, box.h)) {
         box.y = ny;
       } else {
-        for (let nudge = 1; nudge <= 7; nudge++) {
-          if (!this.collidesWithMap(box.x - nudge, ny, box.w, box.h)) {
-            box.x -= Math.min(nudge, Math.abs(dy) * 0.9);
+        for (let nudge = 1; nudge <= 6; nudge++) {
+          const step = Math.min(nudge, Math.abs(dy) * 0.85);
+          if (
+            !this.collidesWithMap(box.x - nudge, ny, box.w, box.h) &&
+            !this.collidesWithMap(box.x - step, box.y, box.w, box.h)
+          ) {
+            box.x -= step;
             break;
           }
-          if (!this.collidesWithMap(box.x + nudge, ny, box.w, box.h)) {
-            box.x += Math.min(nudge, Math.abs(dy) * 0.9);
+          if (
+            !this.collidesWithMap(box.x + nudge, ny, box.w, box.h) &&
+            !this.collidesWithMap(box.x + step, box.y, box.w, box.h)
+          ) {
+            box.x += step;
             break;
           }
         }
       }
     }
+  }
+
+  private openDungeonChest(cx: number, cy: number): void {
+    this.chestOpenedInDungeon = true;
+    soundEngine.chestOpen();
+    this.spawnBurst(cx, cy, '#ffd43b', 18, 130);
+    this.addShake(3, 100);
+
+    const goldGain = 15 + this.dungeon.id * 5;
+    this.inventory.gold += goldGain;
+
+    // Desbloqueia automaticamente uma arma ou armadura se houver bloqueada na dungeon 2 ou 3
+    let rewardLabel = `+${goldGain} OURO!`;
+    if (this.dungeon.id === 1 && !this.inventory.unlockedWeapons.includes('flame_staff')) {
+      this.inventory.unlockedWeapons = [...this.inventory.unlockedWeapons, 'flame_staff'];
+      rewardLabel = 'CAJADO FLAMEJANTE!';
+    } else if (this.dungeon.id === 2 && !this.inventory.unlockedArmors.includes('shadow_cloak')) {
+      this.inventory.unlockedArmors = [...this.inventory.unlockedArmors, 'shadow_cloak'];
+      rewardLabel = 'MANTO SOMBRIO!';
+    } else if (this.dungeon.id === 3 && !this.inventory.unlockedWeapons.includes('forge_axe')) {
+      this.inventory.unlockedWeapons = [...this.inventory.unlockedWeapons, 'forge_axe'];
+      rewardLabel = 'MACHADO DA FORJA!';
+    } else {
+      this.inventory.potions += 1;
+      rewardLabel = `+${goldGain} OURO + POÇÃO!`;
+    }
+
+    this.spawnFloatingText(cx, cy - 16, rewardLabel, '#ffd43b');
+    this.hintText = `Tesouro coletado: ${rewardLabel} Abra a 🎒 Mochila para equipar!`;
+    this.emitSnapshot();
   }
 
   private addShake(intensity: number, durationMs: number): void {
@@ -337,7 +519,7 @@ export class DungeonGameEngine {
     for (let i = 0; i < count; i++) {
       const angle = (Math.PI * 2 * i) / count + (Math.random() - 0.5) * 0.5;
       const speed = 28 + Math.random() * speedMax;
-      const life = 0.25 + Math.random() * 0.28;
+      const life = 0.25 + Math.random() * 0.26;
       this.particles.push({
         x: cx,
         y: cy,
@@ -358,8 +540,8 @@ export class DungeonGameEngine {
       vy: -34,
       text,
       color,
-      life: 0.7,
-      maxLife: 0.7,
+      life: 0.78,
+      maxLife: 0.78,
     });
   }
 
@@ -370,21 +552,23 @@ export class DungeonGameEngine {
     this.moveWithSlide(this.enemy, knockX, knockY);
     const eCx = this.enemy.x + this.enemy.w / 2;
     const eCy = this.enemy.y + this.enemy.h / 2;
-    this.spawnBurst(eCx, eCy, this.dungeon.accentColor, 10, 120);
-    this.spawnFloatingText(eCx, eCy - 14, `-${amount}`, amount >= 2 ? '#ffd43b' : '#ffffff');
+    this.spawnBurst(eCx, eCy, this.dungeon.accentColor, 10, 115);
+    this.spawnFloatingText(eCx, eCy - 14, `-${amount}`, amount >= 3 ? '#ff922b' : amount >= 2 ? '#ffd43b' : '#ffffff');
     this.addShake(amount >= 2 ? 4.5 : 2.5, 110);
-    this.hitstopMs = amount >= 2 ? 32 : 16;
+    this.hitstopMs = amount >= 2 ? 28 : 14;
     soundEngine.hitEnemy();
 
     if (this.enemy.hp <= 0) {
       this.enemy.alive = false;
       this.portalUnlocked = true;
       this.projectiles = this.projectiles.filter((p) => p.fromPlayer);
-      this.hintText = 'Inimigo derrotado! Entre no Portal Runico brilhante a direita!';
-      this.spawnBurst(eCx, eCy, '#ffd43b', 24, 150);
+      this.inventory.gold += 25;
+      this.inventory.potions += 1;
+      this.hintText = 'Chefe derrotado (+25 Ouro, +1 Poção)! Entre no Portal Rúnico!';
+      this.spawnBurst(eCx, eCy, '#ffd43b', 22, 145);
       this.spawnBurst(eCx, eCy, '#63e6be', 14, 110);
-      this.spawnFloatingText(eCx, eCy - 18, 'PORTAL ABERTO!', '#63e6be');
-      this.addShake(6.5, 220);
+      this.spawnFloatingText(eCx, eCy - 18, '+25 OURO! PORTAL ABERTO!', '#63e6be');
+      this.addShake(6, 200);
       soundEngine.portalUnlock();
     }
     this.emitSnapshot();
@@ -392,19 +576,37 @@ export class DungeonGameEngine {
 
   private damagePlayer(amount = 1): void {
     if (this.player.invulnMs > 0 || this.player.dashMs > 0 || this.status !== 'playing') return;
-    this.player.hp -= amount;
     this.player.invulnMs = 950;
     this.player.hurtMs = 220;
+    this.player.shieldRegenDelayMs = 4200;
+    this.player.shieldRegenTickMs = 0;
+
     const pCx = this.player.x + this.player.w / 2;
     const pCy = this.player.y + this.player.h / 2;
-    this.spawnBurst(pCx, pCy, '#ff6b6b', 12, 110);
-    this.spawnFloatingText(pCx, pCy - 14, `-${amount}`, '#ff6b6b');
-    this.addShake(5.5, 160);
-    soundEngine.hurtPlayer();
+
+    // Escudo estilo Soul Knight absorve o dano primeiro!
+    if (this.player.shield > 0) {
+      const absorbed = Math.min(this.player.shield, amount);
+      this.player.shield -= absorbed;
+      const leftover = amount - absorbed;
+      this.spawnBurst(pCx, pCy, '#4dabf7', 12, 105);
+      this.spawnFloatingText(pCx, pCy - 14, 'ESCUDO!', '#74c0fc');
+      this.addShake(4, 120);
+      soundEngine.parry();
+      if (leftover > 0) {
+        this.player.hp -= leftover;
+      }
+    } else {
+      this.player.hp -= amount;
+      this.spawnBurst(pCx, pCy, '#ff6b6b', 12, 110);
+      this.spawnFloatingText(pCx, pCy - 14, `-${amount}`, '#ff6b6b');
+      this.addShake(5.5, 160);
+      soundEngine.hurtPlayer();
+    }
 
     if (this.player.hp <= 0) {
       this.status = 'defeat';
-      this.hintText = 'Voce caiu na masmorra! Tente novamente ou troque de dungeon.';
+      this.hintText = 'Você caiu na masmorra! Tente novamente ou equipe itens na Mochila.';
     } else {
       this.callbacks.onDamage(this.player.hp);
     }
@@ -422,7 +624,7 @@ export class DungeonGameEngine {
       this.player.dashDirY = Math.sin(this.player.aimAngle);
     }
     this.player.dashMs = 155;
-    this.player.dashCdMs = 680;
+    this.player.dashCdMs = this.player.dashMaxCdMs;
     this.player.invulnMs = Math.max(this.player.invulnMs, 210);
     this.spawnBurst(
       this.player.x + this.player.w / 2,
@@ -436,8 +638,11 @@ export class DungeonGameEngine {
 
   triggerAttack(): void {
     if (this.status !== 'playing' || this.attackCooldownMs > 0) return;
+    const weapon = WEAPONS[this.inventory.equippedWeapon];
+    const armor = ARMORS[this.inventory.equippedArmor];
+
     this.attackTimerMs = this.attackDurationMs;
-    this.attackCooldownMs = 260;
+    this.attackCooldownMs = weapon.cooldownMs;
     soundEngine.slash();
 
     const pCx = this.player.x + this.player.w / 2;
@@ -445,26 +650,31 @@ export class DungeonGameEngine {
     const ax = Math.cos(this.player.aimAngle);
     const ay = Math.sin(this.player.aimAngle);
 
-    // 1. Onda de energia runica (estilo arma de Soul Knight!)
-    this.projectiles.push({
-      fromPlayer: true,
-      x: pCx + ax * 16,
-      y: pCy + ay * 16,
-      vx: ax * 285,
-      vy: ay * 285,
-      radius: 5,
-      color: '#4dabf7',
-      coreColor: '#e7f5ff',
-      damage: 1,
-      life: 0.72,
-    });
+    // 1. Dispara projeteis conforme a arma equipada
+    const count = weapon.projCount;
+    for (let i = 0; i < count; i++) {
+      const offset = count === 1 ? 0 : (i - (count - 1) / 2) * weapon.spreadRad;
+      const ang = this.player.aimAngle + offset;
+      this.projectiles.push({
+        fromPlayer: true,
+        x: pCx + Math.cos(ang) * 14,
+        y: pCy + Math.sin(ang) * 14,
+        vx: Math.cos(ang) * weapon.projSpeed,
+        vy: Math.sin(ang) * weapon.projSpeed,
+        radius: weapon.id === 'flame_staff' ? 6.5 : 4.8,
+        color: weapon.color,
+        coreColor: weapon.coreColor,
+        damage: weapon.projDamage + armor.bonusDamage,
+        life: weapon.id === 'elf_bow' ? 1.15 : 0.78,
+      });
+    }
 
-    // 2. Corte de espada corpo a corpo (destroi tiros inimigos no caminho!)
+    // 2. Corte corpo a corpo bloqueia tiros inimigos
     for (let i = this.projectiles.length - 1; i >= 0; i--) {
       const proj = this.projectiles[i];
       if (proj.fromPlayer) continue;
       const d = Math.hypot(proj.x - (pCx + ax * 16), proj.y - (pCy + ay * 16));
-      if (d <= 32) {
+      if (d <= weapon.parryRadius) {
         this.spawnBurst(proj.x, proj.y, '#ffd43b', 7, 90);
         this.spawnFloatingText(proj.x, proj.y - 10, 'DEFESA!', '#ffd43b');
         this.projectiles.splice(i, 1);
@@ -472,15 +682,15 @@ export class DungeonGameEngine {
       }
     }
 
-    // 3. Dano corpo a corpo pesado (2 dmg) se inimigo estiver no alcance do arco
+    // 3. Dano corpo a corpo se inimigo estiver no alcance
     if (this.room === 2 && this.enemy.alive) {
       const eCx = this.enemy.x + this.enemy.w / 2;
       const eCy = this.enemy.y + this.enemy.h / 2;
       const dist = Math.hypot(eCx - pCx, eCy - pCy);
-      if (dist <= 52) {
+      if (dist <= weapon.meleeRange) {
         const nx = dist > 0.1 ? (eCx - pCx) / dist : ax;
         const ny = dist > 0.1 ? (eCy - pCy) / dist : ay;
-        this.damageEnemy(2, nx * 18, ny * 18);
+        this.damageEnemy(weapon.meleeDamage + armor.bonusDamage, nx * 16, ny * 16);
       }
     }
   }
@@ -495,7 +705,6 @@ export class DungeonGameEngine {
     soundEngine.enemyShoot();
 
     if (this.dungeon.enemyKind === 'slime') {
-      // Orbe acido unico mais lento
       this.projectiles.push({
         fromPlayer: false,
         x: eCx,
@@ -509,7 +718,6 @@ export class DungeonGameEngine {
         life: 2.4,
       });
     } else if (this.dungeon.enemyKind === 'skeleton') {
-      // Rajada dupla em V
       [-0.18, 0.18].forEach((offset) => {
         const a = baseAngle + offset;
         this.projectiles.push({
@@ -526,7 +734,6 @@ export class DungeonGameEngine {
         });
       });
     } else {
-      // Gargula: leque de 3 bolas de fogo
       [-0.32, 0, 0.32].forEach((offset) => {
         const a = baseAngle + offset;
         this.projectiles.push({
@@ -549,7 +756,6 @@ export class DungeonGameEngine {
     const dt = Math.min(0.045, Math.max(0.001, dtSec));
     this.animTime += dt;
 
-    // Transicao suave de iluminacao (claro <-> escuro ao tampar/destampar LDR)
     const targetLight = this.light === 'dark' ? 1 : 0;
     this.lightLerp += (targetLight - this.lightLerp) * Math.min(1, dt * 6.5);
 
@@ -557,7 +763,6 @@ export class DungeonGameEngine {
       this.roomFlashAlpha = Math.max(0, this.roomFlashAlpha - dt * 1.6);
     }
 
-    // Poeira/brasas ambientes flutuando
     for (const m of this.ambientMotes) {
       m.y -= m.speed * dt;
       m.x += Math.sin(this.animTime * 1.8 + m.phase) * 8 * dt;
@@ -567,7 +772,6 @@ export class DungeonGameEngine {
       }
     }
 
-    // Atualiza particulas
     for (let i = this.particles.length - 1; i >= 0; i--) {
       const p = this.particles[i];
       p.x += p.vx * dt;
@@ -578,7 +782,6 @@ export class DungeonGameEngine {
       if (p.life <= 0) this.particles.splice(i, 1);
     }
 
-    // Atualiza textos flutuantes
     for (let i = this.floatingTexts.length - 1; i >= 0; i--) {
       const f = this.floatingTexts[i];
       f.y += f.vy * dt;
@@ -586,7 +789,6 @@ export class DungeonGameEngine {
       if (f.life <= 0) this.floatingTexts.splice(i, 1);
     }
 
-    // Atualiza rastros do dash
     for (let i = this.dashGhosts.length - 1; i >= 0; i--) {
       this.dashGhosts[i].alpha -= dt * 4.5;
       if (this.dashGhosts[i].alpha <= 0) this.dashGhosts.splice(i, 1);
@@ -613,7 +815,21 @@ export class DungeonGameEngine {
     if (this.attackTimerMs > 0) this.attackTimerMs = Math.max(0, this.attackTimerMs - dt * 1000);
     if (this.attackCooldownMs > 0) this.attackCooldownMs = Math.max(0, this.attackCooldownMs - dt * 1000);
 
-    // Vetor de entrada analogico/teclado
+    // Regeneracao automatica de Escudo estilo Soul Knight!
+    if (this.player.shield < this.player.maxShield) {
+      if (this.player.shieldRegenDelayMs > 0) {
+        this.player.shieldRegenDelayMs = Math.max(0, this.player.shieldRegenDelayMs - dt * 1000);
+      } else {
+        this.player.shieldRegenTickMs += dt * 1000;
+        if (this.player.shieldRegenTickMs >= 1300) {
+          this.player.shieldRegenTickMs = 0;
+          this.player.shield += 1;
+          this.spawnFloatingText(this.player.x + 10, this.player.y - 10, '+1 ESCUDO', '#74c0fc');
+          this.emitSnapshot();
+        }
+      }
+    }
+
     let ix = input.moveX;
     let iy = input.moveY;
     const ilen = Math.hypot(ix, iy);
@@ -626,23 +842,24 @@ export class DungeonGameEngine {
       this.triggerDash(ix, iy);
     }
 
-    // Fisica fluida do heroi
+    const armor = ARMORS[this.inventory.equippedArmor];
     if (this.player.dashMs > 0) {
       this.player.dashMs = Math.max(0, this.player.dashMs - dt * 1000);
-      this.player.vx = this.player.dashDirX * 330;
-      this.player.vy = this.player.dashDirY * 330;
+      this.player.vx = this.player.dashDirX * 335;
+      this.player.vy = this.player.dashDirY * 335;
       this.player.moving = true;
-      if (Math.random() < 0.75) {
+      if (Math.random() < 0.7) {
         this.dashGhosts.push({
           x: this.player.x,
           y: this.player.y,
           aimAngle: this.player.aimAngle,
-          alpha: 0.55,
+          alpha: 0.5,
         });
       }
     } else {
-      const targetVx = ix * 150;
-      const targetVy = iy * 150;
+      const maxSpd = 152 * armor.speedMult;
+      const targetVx = ix * maxSpd;
+      const targetVy = iy * maxSpd;
       const accel = Math.min(1, dt * 14);
       this.player.vx += (targetVx - this.player.vx) * accel;
       this.player.vy += (targetVy - this.player.vy) * accel;
@@ -653,25 +870,23 @@ export class DungeonGameEngine {
 
     this.moveWithSlide(this.player, this.player.vx * dt, this.player.vy * dt);
 
-    // Poeira leve nos pes enquanto corre
     if (this.player.moving && this.player.dashMs <= 0) {
       this.player.stepDustTimer += dt;
-      if (this.player.stepDustTimer >= 0.15) {
+      if (this.player.stepDustTimer >= 0.16) {
         this.player.stepDustTimer = 0;
         this.particles.push({
           x: this.player.x + this.player.w / 2,
           y: this.player.y + this.player.h,
           vx: (Math.random() - 0.5) * 20,
           vy: -8 - Math.random() * 10,
-          life: 0.25,
-          maxLife: 0.25,
-          color: 'rgba(220, 230, 245, 0.55)',
+          life: 0.24,
+          maxLife: 0.24,
+          color: 'rgba(220, 230, 245, 0.5)',
           size: 3,
         });
       }
     }
 
-    // Mira inteligente estilo Soul Knight: mira no inimigo na Sala 2 ou na direcao do movimento
     if (this.room === 2 && this.enemy.alive) {
       const pCx = this.player.x + this.player.w / 2;
       const pCy = this.player.y + this.player.h / 2;
@@ -686,7 +901,6 @@ export class DungeonGameEngine {
       this.triggerAttack();
     }
 
-    // IA do chefe na Sala 2
     if (this.room === 2 && this.enemy.alive) {
       const pCx = this.player.x + this.player.w / 2;
       const pCy = this.player.y + this.player.h / 2;
@@ -719,7 +933,6 @@ export class DungeonGameEngine {
       }
     }
 
-    // Atualiza projeteis (ondas runicas + ataques do inimigo)
     for (let i = this.projectiles.length - 1; i >= 0; i--) {
       const pr = this.projectiles[i];
       pr.x += pr.vx * dt;
@@ -754,25 +967,27 @@ export class DungeonGameEngine {
       }
     }
 
-    // Checa transicao de sala / Portal Final
+    // Checa bau ('C'), porta ('D') e portal ('O')
     const centerCol = Math.floor((this.player.x + this.player.w / 2) / TILE_SIZE);
     const centerRow = Math.floor((this.player.y + this.player.h / 2) / TILE_SIZE);
     const tile = this.getCurrentMap()[centerRow]?.[centerCol];
 
-    if (this.room === 1 && tile === 'D') {
+    if (this.room === 1 && tile === 'C' && !this.chestOpenedInDungeon) {
+      this.openDungeonChest(centerCol * TILE_SIZE + 16, centerRow * TILE_SIZE + 16);
+    } else if (this.room === 1 && tile === 'D') {
       soundEngine.doorEnter();
       this.setupRoom(2);
       this.emitSnapshot();
     } else if (this.room === 2 && tile === 'O' && this.portalUnlocked) {
       this.status = 'victory';
-      this.hintText = `Vitoria em ${this.elapsedSec}s! LED fisico confirmando conclusao.`;
+      this.hintText = `Vitória em ${this.elapsedSec}s! LED físico confirmando conclusão.`;
       soundEngine.victory();
       this.spawnBurst(
         this.player.x + this.player.w / 2,
         this.player.y + this.player.h / 2,
         '#63e6be',
-        26,
-        150,
+        24,
+        145,
       );
       this.callbacks.onVictory(this.dungeon.id, this.elapsedSec);
       this.emitSnapshot();
@@ -793,6 +1008,8 @@ export class DungeonGameEngine {
     const pal = BIOME_PALETTES[this.dungeon.biome];
     const tiles = getBiomeTileset(this.dungeon.biome);
     const map = this.getCurrentMap();
+    const weapon = WEAPONS[this.inventory.equippedWeapon];
+    const armor = ARMORS[this.inventory.equippedArmor];
 
     ctx.save();
     if (this.shakeTimerMs > 0) {
@@ -806,7 +1023,6 @@ export class DungeonGameEngine {
 
     const lightSources: Array<{ x: number; y: number; r: number }> = [];
 
-    // 1. Chao, tapetes, paredes 2.5D, sombras projetadas e props
     for (let r = 0; r < GRID_ROWS; r++) {
       for (let c = 0; c < GRID_COLS; c++) {
         const ch = map[r][c];
@@ -816,7 +1032,6 @@ export class DungeonGameEngine {
         if (ch === '#') {
           ctx.drawImage(tiles.wall, x, y);
         } else {
-          // Chao com variacao deterministica para textura rica
           if (ch === ',') {
             ctx.drawImage(tiles.carpet, x, y);
           } else {
@@ -825,7 +1040,6 @@ export class DungeonGameEngine {
             ctx.drawImage(tiles.floors[variant], x, y);
           }
 
-          // Sombra 2.5D projetada pela parede acima
           if (r > 0 && map[r - 1][c] === '#') {
             ctx.fillStyle = 'rgba(0, 0, 0, 0.28)';
             ctx.fillRect(x, y, TILE_SIZE, 6);
@@ -835,7 +1049,12 @@ export class DungeonGameEngine {
             ctx.drawImage(tiles.prop, x, y);
           } else if (ch === 'B') {
             drawBrazier(ctx, x, y, pal, this.animTime);
-            lightSources.push({ x: x + 16, y: y + 12, r: 66 + Math.sin(this.animTime * 12 + c) * 4 });
+            lightSources.push({ x: x + 16, y: y + 12, r: 66 });
+          } else if (ch === 'C') {
+            drawChestTile(ctx, x, y, this.chestOpenedInDungeon, this.animTime);
+            if (!this.chestOpenedInDungeon) {
+              lightSources.push({ x: x + 16, y: y + 16, r: 52 });
+            }
           } else if (ch === 'D') {
             drawDoorTile(ctx, x, y, this.animTime);
             lightSources.push({ x: x + 16, y: y + 16, r: 58 });
@@ -849,21 +1068,18 @@ export class DungeonGameEngine {
       }
     }
 
-    // 2. Poeira / brasas ambientes
     ctx.fillStyle = this.dungeon.biome === 'forge' ? 'rgba(255, 146, 43, 0.45)' : 'rgba(225, 240, 255, 0.22)';
     for (const m of this.ambientMotes) {
       ctx.fillRect(Math.round(m.x), Math.round(m.y), m.size, m.size);
     }
 
-    // 3. Rastros fantasmas do Dash
     for (const g of this.dashGhosts) {
       ctx.save();
       ctx.globalAlpha = Math.max(0, g.alpha);
-      drawHero(ctx, g.x, g.y, g.aimAngle, true, false, true, 0, this.animTime);
+      drawHero(ctx, g.x, g.y, g.aimAngle, true, false, true, 0, this.animTime, weapon.id, armor.tint);
       ctx.restore();
     }
 
-    // 4. Inimigo (Sala 2)
     if (this.room === 2 && this.enemy.alive) {
       drawEnemy(
         ctx,
@@ -875,7 +1091,6 @@ export class DungeonGameEngine {
       );
       lightSources.push({ x: this.enemy.x + 12, y: this.enemy.y + 12, r: 42 });
 
-      // Mini barra de HP acima do inimigo
       const bw = 32;
       const bx = Math.round(this.enemy.x - 4);
       const by = Math.round(this.enemy.y - 11);
@@ -885,7 +1100,6 @@ export class DungeonGameEngine {
       ctx.fillRect(bx, by, Math.round((bw * Math.max(0, this.enemy.hp)) / this.enemy.maxHp), 4);
     }
 
-    // 5. Heroi + Espada
     const blinkHide = this.player.invulnMs > 0 && this.player.dashMs <= 0 && Math.floor(this.player.invulnMs / 65) % 2 === 1;
     const attackProg = this.attackTimerMs > 0 ? 1 - this.attackTimerMs / this.attackDurationMs : 0;
     if (!blinkHide) {
@@ -899,41 +1113,42 @@ export class DungeonGameEngine {
         this.player.dashMs > 0,
         attackProg,
         this.animTime,
+        weapon.id,
+        armor.tint,
       );
     }
 
-    // Barra discreta de recarga do Dash sob o heroi
     if (this.player.dashCdMs > 0) {
-      const ratio = 1 - this.player.dashCdMs / 680;
+      const ratio = 1 - this.player.dashCdMs / this.player.dashMaxCdMs;
       ctx.fillStyle = 'rgba(18, 16, 26, 0.75)';
       ctx.fillRect(Math.round(this.player.x), Math.round(this.player.y + 25), 20, 3);
       ctx.fillStyle = '#66d9e8';
       ctx.fillRect(Math.round(this.player.x), Math.round(this.player.y + 25), Math.round(20 * ratio), 3);
     }
 
-    // 6. Arco luminoso de corte de espada (Soul Knight melee slash!)
-    if (this.attackTimerMs > 0) {
+    // Arco de corte colorido conforme a arma equipada
+    if (this.attackTimerMs > 0 && weapon.id !== 'elf_bow') {
       const pCx = this.player.x + this.player.w / 2;
       const pCy = this.player.y + this.player.h / 2;
       const alpha = this.attackTimerMs / this.attackDurationMs;
+      const arcR = weapon.id === 'forge_axe' ? 32 : 26;
       ctx.save();
       ctx.translate(pCx, pCy);
       ctx.rotate(this.player.aimAngle);
       ctx.globalAlpha = alpha;
-      ctx.strokeStyle = '#74c0fc';
-      ctx.lineWidth = 10;
+      ctx.strokeStyle = weapon.color;
+      ctx.lineWidth = weapon.id === 'forge_axe' ? 13 : 9;
       ctx.beginPath();
-      ctx.arc(4, 0, 26, -1.05, 1.05);
+      ctx.arc(4, 0, arcR, -1.05, 1.05);
       ctx.stroke();
       ctx.strokeStyle = '#ffffff';
-      ctx.lineWidth = 4;
+      ctx.lineWidth = 3.5;
       ctx.beginPath();
-      ctx.arc(6, 0, 26, -0.95, 0.95);
+      ctx.arc(6, 0, arcR, -0.92, 0.92);
       ctx.stroke();
       ctx.restore();
     }
 
-    // 7. Projeteis brilhantes
     for (const pr of this.projectiles) {
       ctx.fillStyle = pr.color;
       ctx.beginPath();
@@ -946,7 +1161,6 @@ export class DungeonGameEngine {
       lightSources.push({ x: pr.x, y: pr.y, r: 28 });
     }
 
-    // 8. Particulas
     for (const p of this.particles) {
       ctx.globalAlpha = Math.max(0, p.life / p.maxLife);
       ctx.fillStyle = p.color;
@@ -954,12 +1168,13 @@ export class DungeonGameEngine {
     }
     ctx.globalAlpha = 1;
 
-    // 9. Iluminacao dinamica multi-foco quando LDR indica ESCURO (suavizada com lightLerp)
+    // Iluminacao dinamica ultra-leve (usa carimbo pre-renderizado -> 60fps liso no Android!)
     if (this.lightLerp > 0.02) {
       const lctx = this.ensureLightCanvas();
+      const hole = getLightHoleStamp();
       const heroCx = this.player.x + this.player.w / 2;
       const heroCy = this.player.y + this.player.h / 2;
-      const heroR = 112 + Math.sin(this.animTime * 13) * 5;
+      const heroR = (weapon.id === 'flame_staff' ? 135 : 112) + Math.sin(this.animTime * 11) * 4;
 
       lctx.globalCompositeOperation = 'source-over';
       lctx.clearRect(0, 0, CANVAS_WIDTH, CANVAS_HEIGHT);
@@ -967,36 +1182,22 @@ export class DungeonGameEngine {
       lctx.fillRect(0, 0, CANVAS_WIDTH, CANVAS_HEIGHT);
 
       lctx.globalCompositeOperation = 'destination-out';
-      const punch = (lx: number, ly: number, radius: number) => {
-        const g = lctx.createRadialGradient(lx, ly, radius * 0.12, lx, ly, radius);
-        g.addColorStop(0, 'rgba(0,0,0,1)');
-        g.addColorStop(0.6, 'rgba(0,0,0,0.68)');
-        g.addColorStop(1, 'rgba(0,0,0,0)');
-        lctx.fillStyle = g;
-        lctx.beginPath();
-        lctx.arc(lx, ly, radius, 0, Math.PI * 2);
-        lctx.fill();
-      };
-
-      punch(heroCx, heroCy, heroR);
+      lctx.drawImage(hole, heroCx - heroR, heroCy - heroR, heroR * 2, heroR * 2);
       for (const ls of lightSources) {
-        punch(ls.x, ls.y, ls.r);
+        lctx.drawImage(hole, ls.x - ls.r, ls.y - ls.r, ls.r * 2, ls.r * 2);
       }
 
       ctx.drawImage(this.lightCanvas!, 0, 0);
 
-      // Brilho quente da tocha ao redor do heroi no modo sombrio
-      const warm = ctx.createRadialGradient(heroCx, heroCy, 8, heroCx, heroCy, heroR * 0.85);
-      warm.addColorStop(0, `rgba(255, 190, 92, ${(0.18 * this.lightLerp).toFixed(3)})`);
-      warm.addColorStop(1, 'rgba(255, 140, 40, 0)');
-      ctx.fillStyle = warm;
-      ctx.beginPath();
-      ctx.arc(heroCx, heroCy, heroR * 0.85, 0, Math.PI * 2);
-      ctx.fill();
+      // Brilho quente pre-renderizado da tocha do heroi
+      const warm = getGlowStamp('rgba(255, 190, 92, 0.22)');
+      ctx.save();
+      ctx.globalAlpha = this.lightLerp;
+      ctx.drawImage(warm, heroCx - heroR * 0.85, heroCy - heroR * 0.85, heroR * 1.7, heroR * 1.7);
+      ctx.restore();
     }
 
-    // 10. Textos flutuantes de dano / parry / portal
-    ctx.font = 'bold 12px monospace';
+    ctx.font = 'bold 11px monospace';
     ctx.textAlign = 'center';
     for (const f of this.floatingTexts) {
       ctx.globalAlpha = Math.max(0, f.life / f.maxLife);
@@ -1007,7 +1208,6 @@ export class DungeonGameEngine {
     }
     ctx.globalAlpha = 1;
 
-    // 11. Barra de chefe estilo Soul Knight no rodape da Sala 2
     if (this.room === 2 && this.enemy.alive) {
       const barW = 200;
       const barX = (CANVAS_WIDTH - barW) / 2;
@@ -1027,7 +1227,6 @@ export class DungeonGameEngine {
       ctx.fillRect(barX, barY, Math.round((barW * this.enemy.hp) / this.enemy.maxHp), 5);
     }
 
-    // Flash suave de transicao de sala
     if (this.roomFlashAlpha > 0) {
       ctx.fillStyle = `rgba(255, 255, 255, ${this.roomFlashAlpha.toFixed(3)})`;
       ctx.fillRect(0, 0, CANVAS_WIDTH, CANVAS_HEIGHT);

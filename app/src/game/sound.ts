@@ -88,6 +88,20 @@ class RetroSoundEngine {
   dungeonLoaded(): void {
     this.playTone(392, 587, 0.12, 'triangle', 0.07);
   }
+
+  chestOpen(): void {
+    this.playTone(523, 784, 0.1, 'triangle', 0.075);
+    setTimeout(() => this.playTone(784, 1175, 0.14, 'square', 0.06), 85);
+  }
+
+  heal(): void {
+    this.playTone(440, 880, 0.14, 'sine', 0.07);
+    setTimeout(() => this.playTone(660, 990, 0.12, 'sine', 0.06), 90);
+  }
+
+  equip(): void {
+    this.playTone(480, 720, 0.08, 'square', 0.055);
+  }
 }
 
 export const soundEngine = new RetroSoundEngine();
