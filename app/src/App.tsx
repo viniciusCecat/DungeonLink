@@ -7,10 +7,16 @@ import {
 import type { IncomingEsp32Payload, LedMode, LightState } from './ble/protocol';
 import { ControlPanel } from './components/ControlPanel';
 import { GameCanvas } from './components/GameCanvas';
+import { MultiplayerPanel } from './components/MultiplayerPanel';
 import { TelemetryPanel, type TelemetryRecord } from './components/TelemetryPanel';
 import { DungeonGameEngine, type GameSnapshot } from './game/engine';
+import {
+  DungeonMultiplayerClient,
+  type MpRoomInfo,
+  type MultiplayerMode,
+} from './net/multiplayerClient';
 
-type OptionsTab = 'hardware' | 'telemetry';
+type OptionsTab = 'hardware' | 'telemetry' | 'multiplayer';
 
 function formatNow(): string {
   return new Date().toLocaleTimeString('pt-BR', { hour12: false });
@@ -31,11 +37,21 @@ export const App: React.FC = () => {
   const [ledMode, setLedMode] = useState<LedMode>('auto');
   const [simLdrRaw, setSimLdrRaw] = useState<number>(2450);
 
+  const [mpStatus, setMpStatus] = useState<'offline' | 'connecting' | 'in_room'>('offline');
+  const [mpRoom, setMpRoom] = useState<MpRoomInfo | null>(null);
+  const [mpSlot, setMpSlot] = useState<1 | 2 | null>(null);
+  const [mpError, setMpError] = useState('');
+
   const [telemetryHistory, setTelemetryHistory] = useState<TelemetryRecord[]>([]);
   const [packetLogs, setPacketLogs] = useState<PacketLogEntry[]>([]);
   const recordCounterRef = useRef(0);
   const bleServiceRef = useRef<DungeonBleService | null>(null);
+  const mpClientRef = useRef<DungeonMultiplayerClient | null>(null);
   const onStateChangeRef = useRef<(snap: GameSnapshot) => void>(() => {});
+  const mpRoomRef = useRef<MpRoomInfo | null>(null);
+  const mpSlotRef = useRef<1 | 2 | null>(null);
+  mpRoomRef.current = mpRoom;
+  mpSlotRef.current = mpSlot;
 
   const engine = useMemo(
     () =>
@@ -49,6 +65,25 @@ export const App: React.FC = () => {
         },
         onStateChange: (snap) => {
           onStateChangeRef.current(snap);
+        },
+        onLocalStateBroadcast: (state) => {
+          mpClientRef.current?.sendState(state);
+        },
+        onLocalAttackBroadcast: (data) => {
+          mpClientRef.current?.sendAttack(data);
+        },
+        onEnemyHitBroadcast: (enemyId, damage) => {
+          mpClientRef.current?.sendEnemyHit(enemyId, damage);
+        },
+        onPvpHitBroadcast: (damage, kx, ky) => {
+          mpClientRef.current?.sendPvpHit(damage, kx, ky);
+        },
+        onPvpLocalDefeated: () => {
+          const winnerSlot: 1 | 2 = mpSlotRef.current === 1 ? 2 : 1;
+          mpClientRef.current?.sendPvpKo(winnerSlot);
+        },
+        onRoomChangeBroadcast: (dungeonId, room) => {
+          mpClientRef.current?.sendRoomSync(dungeonId, room);
         },
       }),
     [],
@@ -68,6 +103,53 @@ export const App: React.FC = () => {
   }, [toastMsg]);
 
   useEffect(() => {
+    const mp = new DungeonMultiplayerClient({
+      onStatusChange: (status, room, slot, err) => {
+        setMpStatus(status);
+        setMpRoom(room);
+        setMpSlot(slot);
+        setMpError(err || '');
+        if (status === 'offline') {
+          engine.setMultiplayerSession('solo', 1);
+        }
+      },
+      onRemoteState: (patch) => {
+        const room = mpRoomRef.current;
+        const mySlot = mpSlotRef.current;
+        const peer = room?.players.find((p) => p.slot !== mySlot);
+        engine.updateRemoteHero(patch, peer?.name || 'Jogador 2', peer?.slot || 2);
+      },
+      onRemoteAttack: (data) => {
+        engine.receiveRemoteAttack(data);
+      },
+      onRemoteEnemyHit: ({ enemyId, damage }) => {
+        engine.applyRemoteEnemyHit(enemyId, damage);
+      },
+      onPvpHitReceived: ({ damage, kx, ky }) => {
+        engine.applyPvpHitReceived(damage, kx, ky);
+      },
+      onMatchReset: (room) => {
+        const mySlot = mpClientRef.current?.slot ?? 1;
+        engine.setMultiplayerSession(room.mode, mySlot, room.dungeonId, room.scores);
+        setOptionsOpen(false);
+        showToast(
+          room.mode === 'pvp'
+            ? `Sala X1 ${room.code} pronta! Duelo 1v1 iniciado!`
+            : `Sala CO-OP ${room.code} conectada!`,
+        );
+      },
+      onPvpScore: (winnerSlot, scores) => {
+        engine.updatePvpScores(winnerSlot, scores);
+      },
+      onRoomSync: ({ dungeonId, room }) => {
+        engine.syncToRoomFromPeer(dungeonId, room);
+      },
+      onPeerLeft: () => {
+        engine.clearRemoteHero();
+      },
+    });
+    mpClientRef.current = mp;
+
     const service = new DungeonBleService({
       onStatusChange: (mode, label, err) => {
         setConnectionMode(mode);
@@ -123,7 +205,6 @@ export const App: React.FC = () => {
 
     bleServiceRef.current = service;
 
-    // Suporte a query param ?demo= para captura de evidencias e testes rapidos
     const demo = new URLSearchParams(window.location.search).get('demo');
     if (demo === 'bright') {
       setSimLdrRaw(2850);
@@ -169,6 +250,7 @@ export const App: React.FC = () => {
     }
 
     return () => {
+      mp.disconnect();
       service.disconnect().catch(() => {});
     };
   }, [engine, showToast]);
@@ -199,9 +281,12 @@ export const App: React.FC = () => {
     if (connectionMode === 'ble' || connectionMode === 'simulator') {
       bleServiceRef.current?.sendNewDungeonCommand().catch(() => {});
     } else {
-      const nextId = (gameSnapshot.dungeonId % 3) + 1;
+      const nextId = ((gameSnapshot.dungeonId % 3) + 1) as 1 | 2 | 3;
       engine.loadDungeon(nextId, light, true);
-      showToast(`Modo offline: Dungeon #${nextId} carregada localmente.`);
+      if (mpRoom?.mode === 'coop') {
+        mpClientRef.current?.sendRoomSync(nextId, 1);
+      }
+      showToast(`Dungeon #${nextId} carregada!`);
     }
   };
 
@@ -238,21 +323,25 @@ export const App: React.FC = () => {
         errorMsg={errorMsg}
         toastMsg={toastMsg}
         optionsOpen={optionsOpen}
+        mpRoom={mpRoom}
         onConnectBle={handleConnectBle}
-        onOpenOptions={() => setOptionsOpen(true)}
+        onOpenOptions={(tab = 'hardware') => {
+          setOptionsTab(tab);
+          setOptionsOpen(true);
+        }}
         onRequestNewDungeon={handleRequestNewDungeon}
         onRetryDungeon={handleRetryDungeon}
       />
 
-      {/* Menu de Opcoes (Bluetooth, Telemetria, Modo Auto/Manual e Seguranca) */}
+      {/* Menu de Opcoes (Bluetooth, Multiplayer CO-OP/X1, Telemetria e Seguranca) */}
       {optionsOpen && (
         <div className="options-backdrop" onClick={() => setOptionsOpen(false)}>
           <div className="options-drawer" onClick={(e) => e.stopPropagation()}>
             <div className="options-header">
               <div>
-                <h2>⚙ Opções &amp; Painel IoT</h2>
+                <h2>Opções, Multiplayer &amp; Painel IoT</h2>
                 <span className="inv-sub">
-                  Conexão BLE ESP32, Telemetria LDR em Tempo Real e Segurança HMAC-SHA256
+                  BLE ESP32, Salas Online CO-OP/X1 (Tailscale VPN), Telemetria LDR e Segurança HMAC
                 </span>
               </div>
               <button type="button" className="btn btn-secondary" onClick={() => setOptionsOpen(false)}>
@@ -260,20 +349,27 @@ export const App: React.FC = () => {
               </button>
             </div>
 
-            <div className="options-tabs">
+            <div className="options-tabs options-tabs-3">
               <button
                 type="button"
                 className={`tab-btn ${optionsTab === 'hardware' ? 'active' : ''}`}
                 onClick={() => setOptionsTab('hardware')}
               >
-                🔌 Bluetooth, Controle &amp; Segurança
+                BLE &amp; Segurança
+              </button>
+              <button
+                type="button"
+                className={`tab-btn ${optionsTab === 'multiplayer' ? 'active' : ''}`}
+                onClick={() => setOptionsTab('multiplayer')}
+              >
+                Multiplayer {mpRoom ? `(${mpRoom.code})` : '(CO-OP / X1)'}
               </button>
               <button
                 type="button"
                 className={`tab-btn ${optionsTab === 'telemetry' ? 'active' : ''}`}
                 onClick={() => setOptionsTab('telemetry')}
               >
-                📊 Telemetria &amp; Gráfico ({telemetryHistory.length})
+                Telemetria ({telemetryHistory.length})
               </button>
             </div>
 
@@ -295,6 +391,26 @@ export const App: React.FC = () => {
                   onSetMode={handleSetMode}
                   onSetManualLed={handleSetManualLed}
                   onSendForgedSecurityTest={handleSendForgedSecurityTest}
+                />
+              </div>
+            )}
+
+            {optionsTab === 'multiplayer' && (
+              <div className="options-body">
+                <MultiplayerPanel
+                  status={mpStatus}
+                  room={mpRoom}
+                  slot={mpSlot}
+                  errorMsg={mpError}
+                  currentDungeonId={gameSnapshot.dungeonId}
+                  onCreateRoom={(url, name, mode, dungeonId) =>
+                    mpClientRef.current?.createRoom(url, name, mode, dungeonId)
+                  }
+                  onJoinRoom={(url, code, name) => mpClientRef.current?.joinRoom(url, code, name)}
+                  onSwitchMode={(mode: MultiplayerMode, dungeonId: 1 | 2 | 3) =>
+                    mpClientRef.current?.switchMode(mode, dungeonId)
+                  }
+                  onDisconnect={() => mpClientRef.current?.disconnect()}
                 />
               </div>
             )}

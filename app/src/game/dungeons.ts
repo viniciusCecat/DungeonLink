@@ -4,7 +4,7 @@ export const TILE_SIZE = 32;
 export const CANVAS_WIDTH = GRID_COLS * TILE_SIZE;
 export const CANVAS_HEIGHT = GRID_ROWS * TILE_SIZE;
 
-export type EnemyKind = 'slime' | 'skeleton' | 'gargoyle';
+export type EnemyKind = 'slime' | 'skeleton' | 'gargoyle' | 'goblin' | 'bat' | 'imp';
 export type BiomeKind = 'ruins' | 'crypt' | 'forge';
 
 export interface DungeonDefinition {
@@ -12,14 +12,17 @@ export interface DungeonDefinition {
   name: string;
   subtitle: string;
   biome: BiomeKind;
-  enemyKind: EnemyKind;
-  enemyName: string;
-  enemyMaxHp: number;
+  bossKind: 'slime' | 'skeleton' | 'gargoyle';
+  minionKind: 'goblin' | 'bat' | 'imp';
+  bossName: string;
+  minionName: string;
+  bossMaxHp: number;
+  minionMaxHp: number;
   enemySpeed: number;
   enemyFireRateMs: number;
   accentColor: string;
-  room1: string[];
-  room2: string[];
+  rooms: [string[], string[], string[]];
+  pvpArena: string[];
 }
 
 // Legenda dos mapas (16 colunas x 10 linhas):
@@ -27,117 +30,206 @@ export interface DungeonDefinition {
 // 'B' = Braseiro/Tocha iluminada (obstaculo)
 // 'T' = Caixa/Pilar decorativo (obstaculo)
 // ',' = Tapete/Trilha central decorativa (chao livre)
-// '.' = Chao de pedra (chao livre com variacao procedural)
-// 'P' = Spawn do heroi
-// 'D' = Arco/Porta dourada (Sala 1 -> Sala 2)
-// 'E' = Spawn do chefe da sala (Sala 2)
-// 'O' = Portal runico final (Sala 2)
-// 'C' = Bau de tesouro interativo (equipamento, pocao ou ouro)
+// '.' = Chao de pedra
+// 'P' = Spawn do Jogador 1
+// 'Q' = Spawn do Jogador 2 (CO-OP / X1)
+// 'C' = Bau de tesouro interativo
+// 'm' = Inimigo intermediario (guarda/minion)
+// 'E' = Chefe da masmorra (Sala 3)
+// 'D' = Porta dourada (abre apos limpar inimigos da sala!)
+// 'O' = Portal runico final (Sala 3)
 export const DUNGEONS: Record<1 | 2 | 3, DungeonDefinition> = {
   1: {
     id: 1,
     name: 'Cripta das Pedras',
-    subtitle: 'Ruinas com musgo guardadas pelo Slime Rei',
+    subtitle: 'Ruinas com musgo guardadas por Goblins e o Slime Rei',
     biome: 'ruins',
-    enemyKind: 'slime',
-    enemyName: 'Slime Acido',
-    enemyMaxHp: 6,
+    bossKind: 'slime',
+    minionKind: 'goblin',
+    bossName: 'Slime Rei Ácido',
+    minionName: 'Goblin Batedor',
+    bossMaxHp: 10,
+    minionMaxHp: 3,
     enemySpeed: 64,
-    enemyFireRateMs: 1950,
+    enemyFireRateMs: 1850,
     accentColor: '#38d9a9',
-    room1: [
-      '################',
-      '#....B....B....#',
-      '#.P......T.....#',
-      '#.......C......#',
-      '#.,T,........,D#',
-      '#.,T,........,D#',
-      '#..............#',
-      '#........T.....#',
-      '#....B....B....#',
-      '################',
+    rooms: [
+      [
+        '################',
+        '#...B......B...#',
+        '#.P....T.......#',
+        '#..Q....C...m..#',
+        '#.,,,,,,,,,,.,D#',
+        '#.,,,,,,,,,,.,D#',
+        '#...........m..#',
+        '#......T.......#',
+        '#...B......B...#',
+        '################',
+      ],
+      [
+        '################',
+        '#..B...T....B..#',
+        '#.P.......m....#',
+        '#..Q.T.........#',
+        '#.,,,,,,C.,m.,D#',
+        '#.,,,,,,,,...,D#',
+        '#....T.........#',
+        '#.........m....#',
+        '#..B...T....B..#',
+        '################',
+      ],
+      [
+        '################',
+        '#...B......B...#',
+        '#.P.......m....#',
+        '#..Q..T..T.....#',
+        '#.,......E...,O#',
+        '#.,..........,O#',
+        '#.....T..T.....#',
+        '#..............#',
+        '#...B......B...#',
+        '################',
+      ],
     ],
-    room2: [
+    pvpArena: [
       '################',
-      '#...B......B...#',
-      '#.P............#',
-      '#.....T..T.....#',
-      '#.,..........,.#',
-      '#.,......E...,O#',
-      '#.....T..T...,O#',
+      '#..B........B..#',
+      '#....T....T....#',
       '#..............#',
-      '#...B......B...#',
+      '#.P.,,,,,,,,.Q.#',
+      '#...,,,,,,,,...#',
+      '#..............#',
+      '#....T....T....#',
+      '#..B........B..#',
       '################',
     ],
   },
   2: {
     id: 2,
     name: 'Catacumba de Ossos',
-    subtitle: 'Salao gotico patrulhado pelo Esqueleto Cavaleiro',
+    subtitle: 'Salao gotico infestado por Morcegos e o Esqueleto Cavaleiro',
     biome: 'crypt',
-    enemyKind: 'skeleton',
-    enemyName: 'Esqueleto Cavaleiro',
-    enemyMaxHp: 8,
+    bossKind: 'skeleton',
+    minionKind: 'bat',
+    bossName: 'Esqueleto Cavaleiro',
+    minionName: 'Morcego Sombrio',
+    bossMaxHp: 12,
+    minionMaxHp: 4,
     enemySpeed: 76,
     enemyFireRateMs: 1650,
     accentColor: '#b197fc',
-    room1: [
-      '################',
-      '#..B...##...B..#',
-      '#.P............#',
-      '#.......C..T...#',
-      '#.,,T,,,,,...,,D',
-      '#.,,,,,,,,...,,D',
-      '#...T......T...#',
-      '#..............#',
-      '#..B...##...B..#',
-      '################',
+    rooms: [
+      [
+        '################',
+        '#..B...##...B..#',
+        '#.P.........m..#',
+        '#..Q....C......#',
+        '#.,,T,,,,,...,,D',
+        '#.,,,,,,,,...,,D',
+        '#...T.......m..#',
+        '#..............#',
+        '#..B...##...B..#',
+        '################',
+      ],
+      [
+        '################',
+        '#..B........B..#',
+        '#.P...T...m....#',
+        '#..Q...........#',
+        '#.,,..C..T..m,,D',
+        '#.,,........,,,D',
+        '#.....T........#',
+        '#.........m....#',
+        '#..B........B..#',
+        '################',
+      ],
+      [
+        '################',
+        '#..B........B..#',
+        '#.P....T...m...#',
+        '#..Q...........#',
+        '#.,,,,.....E.,,O',
+        '#.,,,,.......,,O',
+        '#......T.......#',
+        '#..............#',
+        '#..B...T....B..#',
+        '################',
+      ],
     ],
-    room2: [
+    pvpArena: [
       '################',
-      '#..B........B..#',
-      '#.P....T.......#',
+      '#..B...##...B..#',
       '#..............#',
-      '#.,,,,.....E.,,O',
-      '#.,,,,.......,,O',
-      '#......T.......#',
+      '#....T....T....#',
+      '#.P.,,,,,,,,.Q.#',
+      '#...,,,,,,,,...#',
+      '#....T....T....#',
       '#..............#',
-      '#..B...T....B..#',
+      '#..B...##...B..#',
       '################',
     ],
   },
   3: {
     id: 3,
     name: 'Forja Sombria',
-    subtitle: 'Camara de magma protegida pela Gargula de Ferro',
+    subtitle: 'Camara de magma protegida por Diabretes e a Gargula de Ferro',
     biome: 'forge',
-    enemyKind: 'gargoyle',
-    enemyName: 'Gargula de Ferro',
-    enemyMaxHp: 10,
+    bossKind: 'gargoyle',
+    minionKind: 'imp',
+    bossName: 'Gárgula de Ferro',
+    minionName: 'Diabrete de Brasa',
+    bossMaxHp: 14,
+    minionMaxHp: 5,
     enemySpeed: 84,
-    enemyFireRateMs: 1450,
+    enemyFireRateMs: 1480,
     accentColor: '#ff6b6b',
-    room1: [
-      '################',
-      '#..B........B..#',
-      '#.P....T.......#',
-      '#.......C......#',
-      '#.,,.,,,,,,..,D#',
-      '#.,,.,,,,,,..,D#',
-      '#..............#',
-      '#......T.......#',
-      '#..B........B..#',
-      '################',
+    rooms: [
+      [
+        '################',
+        '#..B........B..#',
+        '#.P....T....m..#',
+        '#..Q....C......#',
+        '#.,,.,,,,,,..,D#',
+        '#.,,.,,,,,,..,D#',
+        '#...........m..#',
+        '#......T.......#',
+        '#..B........B..#',
+        '################',
+      ],
+      [
+        '################',
+        '#..B........B..#',
+        '#.P.......m....#',
+        '#..Q..T........#',
+        '#.,,.C....T.m,D#',
+        '#.,,.........,D#',
+        '#.....T........#',
+        '#.........m....#',
+        '#..B........B..#',
+        '################',
+      ],
+      [
+        '################',
+        '#..B........B..#',
+        '#.P........m...#',
+        '#..Q.T....T....#',
+        '#.,....E.....,O#',
+        '#.,..........,O#',
+        '#....T....T....#',
+        '#..............#',
+        '#..B........B..#',
+        '################',
+      ],
     ],
-    room2: [
+    pvpArena: [
       '################',
       '#..B........B..#',
-      '#.P............#',
-      '#....T....T....#',
-      '#.,....E.....,O#',
-      '#.,..........,O#',
-      '#....T....T....#',
+      '#.....T..T.....#',
       '#..............#',
+      '#.P.,,,,,,,,.Q.#',
+      '#...,,,,,,,,...#',
+      '#..............#',
+      '#.....T..T.....#',
       '#..B........B..#',
       '################',
     ],

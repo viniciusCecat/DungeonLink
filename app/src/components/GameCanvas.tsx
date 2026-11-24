@@ -1,9 +1,27 @@
 import React, { useEffect, useRef, useState } from 'react';
 import { CANVAS_HEIGHT, CANVAS_WIDTH } from '../game/dungeons';
 import type { DungeonGameEngine, GameSnapshot } from '../game/engine';
-import { ARMORS, ARMOR_LIST, WEAPONS, WEAPON_LIST } from '../game/items';
+import {
+  ARMORS,
+  ARMOR_LIST,
+  RELICS,
+  RELIC_LIST,
+  WEAPONS,
+  WEAPON_LIST,
+} from '../game/items';
 import type { ConnectionMode } from '../ble/bleService';
 import type { LightState } from '../ble/protocol';
+import type { MpRoomInfo } from '../net/multiplayerClient';
+import {
+  IconBag,
+  IconBluetooth,
+  IconDash,
+  IconGear,
+  IconMap,
+  IconMultiplayer,
+  IconPotion,
+  IconSword,
+} from './GameIcons';
 
 interface GameCanvasProps {
   engine: DungeonGameEngine;
@@ -16,8 +34,9 @@ interface GameCanvasProps {
   errorMsg: string;
   toastMsg: string;
   optionsOpen: boolean;
+  mpRoom: MpRoomInfo | null;
   onConnectBle: () => void;
-  onOpenOptions: () => void;
+  onOpenOptions: (tab?: 'hardware' | 'telemetry' | 'multiplayer') => void;
   onRequestNewDungeon: () => void;
   onRetryDungeon: () => void;
 }
@@ -33,6 +52,7 @@ export const GameCanvas: React.FC<GameCanvasProps> = ({
   errorMsg,
   toastMsg,
   optionsOpen,
+  mpRoom,
   onConnectBle,
   onOpenOptions,
   onRequestNewDungeon,
@@ -40,13 +60,14 @@ export const GameCanvas: React.FC<GameCanvasProps> = ({
 }) => {
   const canvasRef = useRef<HTMLCanvasElement | null>(null);
   const stickZoneRef = useRef<HTMLDivElement | null>(null);
+  const knobRef = useRef<HTMLDivElement | null>(null);
   const stickPointerId = useRef<number | null>(null);
 
   const keysRef = useRef({ up: false, down: false, left: false, right: false });
   const joyRef = useRef({ x: 0, y: 0 });
   const pendingActionRef = useRef({ attack: false, dash: false });
-  const [knobOffset, setKnobOffset] = useState({ x: 0, y: 0 });
   const [inventoryOpen, setInventoryOpen] = useState(false);
+  const [invTab, setInvTab] = useState<'weapons' | 'armors' | 'relics'>('weapons');
   const [invFeedback, setInvFeedback] = useState('');
 
   useEffect(() => {
@@ -127,6 +148,7 @@ export const GameCanvas: React.FC<GameCanvasProps> = ({
     return () => cancelAnimationFrame(rafId);
   }, [engine, inventoryOpen, optionsOpen]);
 
+  // Atualiza o knob direto no DOM (ZERO re-render do React durante o movimento -> sem travadas!)
   const updateJoystick = (clientX: number, clientY: number) => {
     const zone = stickZoneRef.current;
     if (!zone) return;
@@ -143,19 +165,24 @@ export const GameCanvas: React.FC<GameCanvasProps> = ({
     }
     joyRef.current.x = dx / maxR;
     joyRef.current.y = dy / maxR;
-    setKnobOffset({ x: dx, y: dy });
+    if (knobRef.current) {
+      knobRef.current.style.transform = `translate3d(${dx.toFixed(1)}px, ${dy.toFixed(1)}px, 0)`;
+    }
   };
 
   const resetJoystick = () => {
     stickPointerId.current = null;
     joyRef.current.x = 0;
     joyRef.current.y = 0;
-    setKnobOffset({ x: 0, y: 0 });
+    if (knobRef.current) {
+      knobRef.current.style.transform = 'translate3d(0px, 0px, 0)';
+    }
   };
 
   const inv = snapshot.inventory;
   const activeWeapon = WEAPONS[inv.equippedWeapon];
   const activeArmor = ARMORS[inv.equippedArmor];
+  const activeRelic = RELICS[inv.equippedRelic];
 
   return (
     <section className="fs-stage">
@@ -167,7 +194,7 @@ export const GameCanvas: React.FC<GameCanvasProps> = ({
         className="fs-canvas"
       />
 
-      {/* HUD Flutuante Superior (estilo Soul Knight) */}
+      {/* HUD Flutuante Superior (sem backdrop-filter para 60fps constantes no Android) */}
       <div className="fs-hud-top">
         {/* Topo Esquerdo: Vida, Escudo, Arma e Ouro */}
         <div className="hud-pill hud-vitals">
@@ -189,54 +216,83 @@ export const GameCanvas: React.FC<GameCanvasProps> = ({
           </div>
           <div className="hud-subline">
             <span style={{ color: activeWeapon.color, fontWeight: 700 }}>{activeWeapon.name}</span>
-            <span>· 🪙 {inv.gold}</span>
+            <span>·</span>
+            <span className="gold-txt">{inv.gold}G</span>
+            {activeRelic.id !== 'none' && (
+              <span className="relic-mini" style={{ color: activeRelic.color }}>
+                · {activeRelic.name}
+              </span>
+            )}
           </div>
         </div>
 
-        {/* Topo Centro: Nome da Dungeon + Sala */}
+        {/* Topo Centro: Dungeon / Sala / Placar X1 */}
         <div className="hud-pill hud-center-info">
           <strong className="hud-title">
-            #{snapshot.dungeonId} {snapshot.dungeonName}
+            {snapshot.mpMode === 'pvp'
+              ? `ARENA X1 · P1 ${snapshot.pvpScores.p1} × ${snapshot.pvpScores.p2} P2`
+              : `#${snapshot.dungeonId} ${snapshot.dungeonName}`}
           </strong>
           <span className="hud-room-tag">
-            Sala {snapshot.room}/2 · {light === 'dark' ? 'Sombrio' : 'Claro'}
+            {snapshot.mpMode === 'pvp'
+              ? `SALA ${mpRoom?.code ?? ''}`
+              : `Sala ${snapshot.room}/${snapshot.totalRooms} · ${
+                  snapshot.enemiesRemaining > 0
+                    ? `${snapshot.enemiesRemaining} inimigo(s)`
+                    : 'Limpa'
+                } · ${light === 'dark' ? 'Escuro' : 'Claro'}`}
           </span>
         </div>
 
-        {/* Topo Direito: Status IoT compacto + Conectar + Opcoes */}
+        {/* Topo Direito: Status IoT + Multiplayer + Mapa + Opcoes */}
         <div className="hud-right-group">
           <span className={`badge ${connectionMode}`}>
             {connectionMode === 'ble'
-              ? '● BLE'
+              ? 'BLE'
               : connectionMode === 'simulator'
-                ? '● SIM'
+                ? 'SIM'
                 : connectionMode === 'connecting'
-                  ? '◌ BLE...'
-                  : '○ Off'}
+                  ? 'BLE...'
+                  : 'OFF'}
           </span>
           <span className={`badge ${light === 'dark' ? 'dark-pill' : 'bright-pill'}`}>
-            {light === 'dark' ? `🌙 ${ldrPct}%` : `☀ ${ldrPct}%`}
+            {light === 'dark' ? `ESC ${ldrPct}%` : `CLR ${ldrPct}%`}
           </span>
           <span className={`badge ${ledState === 1 ? 'led-on' : 'led-off'}`}>
-            {ledState === 1 ? '🔴' : '⚫'}
+            {ledState === 1 ? 'LED ON' : 'LED'}
           </span>
           {connectionMode === 'disconnected' && (
-            <button type="button" className="btn btn-connect-mini" onClick={onConnectBle}>
-              🔌 Conectar
+            <button type="button" className="btn icon-pill-btn btn-connect-mini" onClick={onConnectBle}>
+              <IconBluetooth size={14} /> BLE
             </button>
           )}
           <button
             type="button"
-            className="btn options-trigger"
-            onClick={onOpenOptions}
+            className={`btn icon-pill-btn ${mpRoom ? 'mp-live-btn' : 'options-trigger'}`}
+            onClick={() => onOpenOptions('multiplayer')}
+          >
+            <IconMultiplayer size={15} /> {mpRoom ? `${mpRoom.mode.toUpperCase()} ${mpRoom.code}` : 'Online'}
+          </button>
+          <button
+            type="button"
+            className="btn icon-pill-btn options-trigger"
+            onClick={onRequestNewDungeon}
+            title="Trocar Dungeon"
+          >
+            <IconMap size={15} />
+          </button>
+          <button
+            type="button"
+            className="btn icon-pill-btn options-trigger"
+            onClick={() => onOpenOptions('hardware')}
             aria-label="Abrir opções"
           >
-            ⚙ Opções
+            <IconGear size={15} /> Opções
           </button>
         </div>
       </div>
 
-      {/* Avisos flutuantes (Erro BLE / Toast / Dica discreta) */}
+      {/* Avisos flutuantes */}
       <div className="fs-banners">
         {errorMsg && !optionsOpen && (
           <div className="fs-alert">
@@ -247,7 +303,7 @@ export const GameCanvas: React.FC<GameCanvasProps> = ({
         {!toastMsg && !errorMsg && <div className="fs-hint">{snapshot.hintText}</div>}
       </div>
 
-      {/* Controle Flutuante Inferior Esquerdo: Analogico 360° */}
+      {/* Controle Inferior Esquerdo: Analogico 360° ultra-responsivo */}
       <div className="fs-ctrl-left">
         <div
           ref={stickZoneRef}
@@ -270,61 +326,58 @@ export const GameCanvas: React.FC<GameCanvasProps> = ({
           onPointerCancel={resetJoystick}
         >
           <div className="joystick-ring" />
-          <div
-            className="joystick-knob"
-            style={{ transform: `translate(${knobOffset.x}px, ${knobOffset.y}px)` }}
-          />
+          <div ref={knobRef} className="joystick-knob" />
         </div>
       </div>
 
-      {/* Controle Flutuante Inferior Direito: Atacar, Dash, Pocao, Mochila, Nova Dungeon */}
-      <div className="fs-ctrl-right">
-        <div className="fs-mini-row">
-          <button
-            type="button"
-            className="btn fs-mini-btn potion-btn"
-            disabled={inv.potions <= 0 || snapshot.playerHp >= snapshot.playerMaxHp}
-            onClick={() => engine.usePotion()}
-          >
-            🧪 {inv.potions}
-          </button>
-          <button
-            type="button"
-            className="btn fs-mini-btn bag-btn"
-            onClick={() => {
-              setInvFeedback('');
-              setInventoryOpen(true);
-            }}
-          >
-            🎒 Mochila
-          </button>
-          <button type="button" className="btn fs-mini-btn btn-secondary" onClick={onRequestNewDungeon}>
-            🎲 Mapa
-          </button>
-        </div>
+      {/* Controle Inferior Direito em Arco Ergonomico estilo Soul Knight */}
+      <div className="fs-ctrl-arc">
+        <button
+          type="button"
+          className="arc-btn arc-bag"
+          aria-label="Abrir Mochila"
+          onClick={() => {
+            setInvFeedback('');
+            setInventoryOpen(true);
+          }}
+        >
+          <IconBag size={22} />
+        </button>
 
-        <div className="fs-combat-row">
-          <button
-            type="button"
-            className="dash-btn fs-dash"
-            onPointerDown={(e) => {
-              e.preventDefault();
-              pendingActionRef.current.dash = true;
-            }}
-          >
-            ⚡ DASH
-          </button>
-          <button
-            type="button"
-            className="attack-btn fs-attack"
-            onPointerDown={(e) => {
-              e.preventDefault();
-              pendingActionRef.current.attack = true;
-            }}
-          >
-            ⚔
-          </button>
-        </div>
+        <button
+          type="button"
+          className="arc-btn arc-potion"
+          aria-label="Usar Poção"
+          disabled={inv.potions <= 0 || snapshot.playerHp >= snapshot.playerMaxHp}
+          onClick={() => engine.usePotion()}
+        >
+          <IconPotion size={21} />
+          <span className="arc-count">{inv.potions}</span>
+        </button>
+
+        <button
+          type="button"
+          className="arc-btn arc-dash"
+          aria-label="Dash"
+          onPointerDown={(e) => {
+            e.preventDefault();
+            pendingActionRef.current.dash = true;
+          }}
+        >
+          <IconDash size={24} />
+        </button>
+
+        <button
+          type="button"
+          className="arc-btn arc-attack"
+          aria-label="Atacar"
+          onPointerDown={(e) => {
+            e.preventDefault();
+            pendingActionRef.current.attack = true;
+          }}
+        >
+          <IconSword size={34} />
+        </button>
       </div>
 
       {/* Overlay de Vitoria */}
@@ -332,10 +385,10 @@ export const GameCanvas: React.FC<GameCanvasProps> = ({
         <div className="canvas-overlay victory">
           <h3>PORTAL ALCANÇADO!</h3>
           <p>
-            {snapshot.dungeonName} concluída em {snapshot.elapsedSec}s.
+            {snapshot.dungeonName} (3 salas) concluída em {snapshot.elapsedSec}s.
             {connected
               ? ' Confirmação enviada ao ESP32 (LED piscando).'
-              : ' Conecte o ESP32 em ⚙ Opções para sincronizar o LED físico.'}
+              : ' Conecte o ESP32 em Opções para sincronizar o LED físico.'}
           </p>
           <div className="overlay-actions">
             <button type="button" className="btn btn-primary" onClick={onRequestNewDungeon}>
@@ -352,32 +405,33 @@ export const GameCanvas: React.FC<GameCanvasProps> = ({
       {snapshot.status === 'defeat' && (
         <div className="canvas-overlay defeat">
           <h3>HERÓI DERROTADO</h3>
-          <p>O guardião da masmorra venceu esta tentativa.</p>
+          <p>Os guardiões da masmorra venceram esta tentativa.</p>
           <div className="overlay-actions">
             <button type="button" className="btn btn-primary" onClick={onRetryDungeon}>
               Tentar Novamente
             </button>
             <button type="button" className="btn bag-btn" onClick={() => setInventoryOpen(true)}>
-              🎒 Abrir Mochila
+              Abrir Mochila
             </button>
           </div>
         </div>
       )}
 
-      {/* Modal de Inventario, Equipamentos e Forja */}
+      {/* Modal de Mochila, Forja e Reliquias */}
       {inventoryOpen && (
         <div className="inv-backdrop" onClick={() => setInventoryOpen(false)}>
           <div className="inv-modal" onClick={(e) => e.stopPropagation()}>
             <div className="inv-header">
               <div>
-                <h3>🎒 Mochila &amp; Forja do Herói</h3>
+                <h3>Mochila &amp; Forja do Herói</h3>
                 <span className="inv-sub">
-                  Equipada: <strong style={{ color: activeWeapon.color }}>{activeWeapon.name}</strong> +{' '}
-                  <strong>{activeArmor.name}</strong>
+                  <strong style={{ color: activeWeapon.color }}>{activeWeapon.name}</strong> ·{' '}
+                  <strong>{activeArmor.name}</strong> ·{' '}
+                  <strong style={{ color: activeRelic.color }}>{activeRelic.name}</strong>
                 </span>
               </div>
               <div className="inv-resources">
-                <span className="badge bright-pill">🪙 {inv.gold} Ouro</span>
+                <span className="badge bright-pill">{inv.gold} Ouro</span>
                 <button
                   type="button"
                   className="btn potion-btn"
@@ -386,7 +440,7 @@ export const GameCanvas: React.FC<GameCanvasProps> = ({
                     setInvFeedback(res.msg);
                   }}
                 >
-                  +1 🧪 (12 🪙)
+                  +1 Poção (12G)
                 </button>
                 <button type="button" className="btn btn-secondary" onClick={() => setInventoryOpen(false)}>
                   Fechar ✕
@@ -396,68 +450,123 @@ export const GameCanvas: React.FC<GameCanvasProps> = ({
 
             {invFeedback && <div className="inv-feedback">{invFeedback}</div>}
 
-            <div className="inv-section-title">⚔ ARMAS (mudam ataque, sprite e projétil)</div>
-            <div className="inv-grid">
-              {WEAPON_LIST.map((w) => {
-                const unlocked = inv.unlockedWeapons.includes(w.id);
-                const equipped = inv.equippedWeapon === w.id;
-                return (
-                  <div key={w.id} className={`inv-card ${equipped ? 'equipped' : ''}`}>
-                    <div className="inv-card-top">
-                      <strong style={{ color: w.color }}>{w.name}</strong>
-                      <span className="pill">{w.tag}</span>
-                    </div>
-                    <p className="inv-desc">{w.description}</p>
-                    <div className="inv-stats">
-                      Corpo: {w.meleeDamage} · Tiro: {w.projDamage}×{w.projCount}
-                    </div>
-                    <button
-                      type="button"
-                      className={`btn ${equipped ? 'btn-secondary' : unlocked ? 'btn-primary' : 'bag-btn'}`}
-                      disabled={equipped}
-                      onClick={() => {
-                        const res = engine.buyOrEquipWeapon(w.id);
-                        setInvFeedback(res.msg);
-                      }}
-                    >
-                      {equipped ? 'Equipada ✓' : unlocked ? 'Equipar' : `Forjar (${w.cost} 🪙)`}
-                    </button>
-                  </div>
-                );
-              })}
+            <div className="inv-tabs">
+              <button
+                type="button"
+                className={`tab-btn ${invTab === 'weapons' ? 'active' : ''}`}
+                onClick={() => setInvTab('weapons')}
+              >
+                Armas ({WEAPON_LIST.length})
+              </button>
+              <button
+                type="button"
+                className={`tab-btn ${invTab === 'armors' ? 'active' : ''}`}
+                onClick={() => setInvTab('armors')}
+              >
+                Armaduras ({ARMOR_LIST.length})
+              </button>
+              <button
+                type="button"
+                className={`tab-btn ${invTab === 'relics' ? 'active' : ''}`}
+                onClick={() => setInvTab('relics')}
+              >
+                Relíquias ({RELIC_LIST.length})
+              </button>
             </div>
 
-            <div className="inv-section-title">🛡 ARMADURAS (mudam escudo, velocidade e bônus)</div>
-            <div className="inv-grid">
-              {ARMOR_LIST.map((a) => {
-                const unlocked = inv.unlockedArmors.includes(a.id);
-                const equipped = inv.equippedArmor === a.id;
-                return (
-                  <div key={a.id} className={`inv-card ${equipped ? 'equipped' : ''}`}>
-                    <div className="inv-card-top">
-                      <strong>{a.name}</strong>
-                      <span className="armor-dot" style={{ background: a.tint }} />
+            {invTab === 'weapons' && (
+              <div className="inv-grid">
+                {WEAPON_LIST.map((w) => {
+                  const unlocked = inv.unlockedWeapons.includes(w.id);
+                  const equipped = inv.equippedWeapon === w.id;
+                  return (
+                    <div key={w.id} className={`inv-card ${equipped ? 'equipped' : ''}`}>
+                      <div className="inv-card-top">
+                        <strong style={{ color: w.color }}>{w.name}</strong>
+                        <span className="pill">{w.tag}</span>
+                      </div>
+                      <p className="inv-desc">{w.description}</p>
+                      <div className="inv-stats">
+                        Corpo: {w.meleeDamage} · Tiro: {w.projDamage}×{w.projCount}
+                      </div>
+                      <button
+                        type="button"
+                        className={`btn ${equipped ? 'btn-secondary' : unlocked ? 'btn-primary' : 'bag-btn'}`}
+                        disabled={equipped}
+                        onClick={() => {
+                          const res = engine.buyOrEquipWeapon(w.id);
+                          setInvFeedback(res.msg);
+                        }}
+                      >
+                        {equipped ? 'Equipada ✓' : unlocked ? 'Equipar' : `Forjar (${w.cost}G)`}
+                      </button>
                     </div>
-                    <p className="inv-desc">{a.description}</p>
-                    <div className="inv-stats">
-                      Escudo: {a.maxShield} · Vel: {Math.round(a.speedMult * 100)}%
-                      {a.bonusDamage > 0 ? ` · +${a.bonusDamage} Dano` : ''}
+                  );
+                })}
+              </div>
+            )}
+
+            {invTab === 'armors' && (
+              <div className="inv-grid">
+                {ARMOR_LIST.map((a) => {
+                  const unlocked = inv.unlockedArmors.includes(a.id);
+                  const equipped = inv.equippedArmor === a.id;
+                  return (
+                    <div key={a.id} className={`inv-card ${equipped ? 'equipped' : ''}`}>
+                      <div className="inv-card-top">
+                        <strong>{a.name}</strong>
+                        <span className="armor-dot" style={{ background: a.tint }} />
+                      </div>
+                      <p className="inv-desc">{a.description}</p>
+                      <div className="inv-stats">
+                        Escudo: {a.maxShield} · Vel: {Math.round(a.speedMult * 100)}%
+                        {a.bonusDamage > 0 ? ` · +${a.bonusDamage} Dano` : ''}
+                      </div>
+                      <button
+                        type="button"
+                        className={`btn ${equipped ? 'btn-secondary' : unlocked ? 'btn-primary' : 'bag-btn'}`}
+                        disabled={equipped}
+                        onClick={() => {
+                          const res = engine.buyOrEquipArmor(a.id);
+                          setInvFeedback(res.msg);
+                        }}
+                      >
+                        {equipped ? 'Equipada ✓' : unlocked ? 'Equipar' : `Forjar (${a.cost}G)`}
+                      </button>
                     </div>
-                    <button
-                      type="button"
-                      className={`btn ${equipped ? 'btn-secondary' : unlocked ? 'btn-primary' : 'bag-btn'}`}
-                      disabled={equipped}
-                      onClick={() => {
-                        const res = engine.buyOrEquipArmor(a.id);
-                        setInvFeedback(res.msg);
-                      }}
-                    >
-                      {equipped ? 'Equipada ✓' : unlocked ? 'Equipar' : `Forjar (${a.cost} 🪙)`}
-                    </button>
-                  </div>
-                );
-              })}
-            </div>
+                  );
+                })}
+              </div>
+            )}
+
+            {invTab === 'relics' && (
+              <div className="inv-grid">
+                {RELIC_LIST.map((r) => {
+                  const unlocked = inv.unlockedRelics.includes(r.id);
+                  const equipped = inv.equippedRelic === r.id;
+                  return (
+                    <div key={r.id} className={`inv-card ${equipped ? 'equipped' : ''}`}>
+                      <div className="inv-card-top">
+                        <strong style={{ color: r.color }}>{r.name}</strong>
+                        <span className="armor-dot" style={{ background: r.color }} />
+                      </div>
+                      <p className="inv-desc">{r.description}</p>
+                      <button
+                        type="button"
+                        className={`btn ${equipped ? 'btn-secondary' : unlocked ? 'btn-primary' : 'bag-btn'}`}
+                        disabled={equipped}
+                        onClick={() => {
+                          const res = engine.buyOrEquipRelic(r.id);
+                          setInvFeedback(res.msg);
+                        }}
+                      >
+                        {equipped ? 'Equipada ✓' : unlocked ? 'Equipar' : `Comprar (${r.cost}G)`}
+                      </button>
+                    </div>
+                  );
+                })}
+              </div>
+            )}
           </div>
         </div>
       )}

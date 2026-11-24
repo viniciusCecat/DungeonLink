@@ -292,6 +292,97 @@ const GARGOYLE_FRAME_1 = [
   '................',
 ];
 
+// Inimigos intermediarios (12x12 -> scale 2 = 24px, ageis e estilosos)
+const GOBLIN_FRAME_0 = [
+  '............',
+  '...OOOOOO...',
+  '.OOGGGGGGOO.',
+  'OGGGLLLLGGGO',
+  '.OGGEEGGEEO.',
+  '..OGGGGGGO..',
+  '..OOBBBBOO..',
+  '.OBBYYYYBBO.',
+  '..OBBBBBBO..',
+  '...OD..DO...',
+  '..OOO..OOO..',
+  '............',
+];
+
+const GOBLIN_FRAME_1 = [
+  '............',
+  '............',
+  '...OOOOOO...',
+  '.OOGGGGGGOO.',
+  'OGGGLLLLGGGO',
+  '.OGGEEGGEEO.',
+  '..OGGGGGGO..',
+  '.OOOBBBBOOO.',
+  '..OBYYYYBO..',
+  '..OD....DO..',
+  '..OO....OO..',
+  '............',
+];
+
+const BAT_FRAME_0 = [
+  '............',
+  'OO........OO',
+  'OPPO.OO.OPPO',
+  'OPPPOPPOPPPO',
+  '.OPPPPPPPPO.',
+  '..OPPEEPPO..',
+  '...OPPPPO...',
+  '....OOOO....',
+  '............',
+  '............',
+  '............',
+  '............',
+];
+
+const BAT_FRAME_1 = [
+  '............',
+  '............',
+  '....OOOO....',
+  '..OOPPPPOO..',
+  '.OPPPEEPPPO.',
+  'OPPPPPPPPPPO',
+  'OPPO.OO.OPPO',
+  'OO........OO',
+  '............',
+  '............',
+  '............',
+  '............',
+];
+
+const IMP_FRAME_0 = [
+  '............',
+  '..OO....OO..',
+  '..ORROORRO..',
+  '..ORRRRRRO..',
+  '..OREEERRO..',
+  '..ORRRRRRO..',
+  '.OODDDDDDOO.',
+  '.ODYYYYYYDO.',
+  '..ODDDDDDO..',
+  '...OR..RO...',
+  '..OOO..OOO..',
+  '............',
+];
+
+const IMP_FRAME_1 = [
+  '............',
+  '............',
+  '..OO....OO..',
+  '..ORROORRO..',
+  '..OREEERRO..',
+  '..ORRRRRRO..',
+  'OOODDDDDDOOO',
+  '..ODYYYYDO..',
+  '..OR....RO..',
+  '..OO....OO..',
+  '............',
+  '............',
+];
+
 interface BiomeTileset {
   floors: HTMLCanvasElement[];
   carpet: HTMLCanvasElement;
@@ -537,12 +628,24 @@ export function drawDoorTile(
   x: number,
   y: number,
   t: number,
+  unlocked = true,
 ): void {
   ctx.fillStyle = '#12151f';
   ctx.fillRect(x + 2, y + 1, 28, 30);
+  if (!unlocked) {
+    ctx.fillStyle = '#343a40';
+    ctx.fillRect(x + 4, y + 3, 24, 26);
+    ctx.fillStyle = '#868e96';
+    ctx.fillRect(x + 8, y + 5, 3, 22);
+    ctx.fillRect(x + 15, y + 5, 3, 22);
+    ctx.fillRect(x + 21, y + 5, 3, 22);
+    ctx.fillStyle = '#fa5252';
+    ctx.fillRect(x + 11, y + 13, 10, 6);
+    return;
+  }
   ctx.fillStyle = '#6c4f2e';
   ctx.fillRect(x + 4, y + 3, 24, 26);
-  const pulse = 0.7 + 0.3 * Math.sin(t * 6);
+  const pulse = 0.72 + 0.28 * Math.sin(t * 6);
   ctx.fillStyle = `rgba(255, 212, 59, ${pulse.toFixed(2)})`;
   ctx.fillRect(x + 8, y + 6, 16, 20);
   ctx.fillStyle = '#fff9db';
@@ -612,12 +715,12 @@ export function drawHero(
   t: number,
   weaponId: WeaponId = 'rune_sword',
   armorTint = '#3b5bdb',
+  isRemote = false,
 ): void {
   const flipX = Math.cos(aimAngle) < 0;
   const frame = moving && Math.floor(t * 10) % 2 === 1 ? HERO_FRAME_1 : HERO_FRAME_0;
   const bob = moving ? Math.round(Math.sin(t * 16) * 1.2) : Math.round(Math.sin(t * 4) * 0.6);
 
-  // Sombra oval suave no chao
   ctx.fillStyle = 'rgba(0, 0, 0, 0.38)';
   ctx.beginPath();
   ctx.ellipse(x + 11, y + 23, 10, 4, 0, 0, Math.PI * 2);
@@ -628,24 +731,25 @@ export function drawHero(
     : dashActive
       ? { O: '#12101a', R: '#66d9e8', H: '#99e9f2', W: '#e3fafc', K: '#15aabf', C: '#ffffff', S: '#ffe8cc', B: '#22b8cf', Y: '#ffd43b', D: '#0c8599' }
       : {
-          O: '#12101a', // contorno grosso Soul Knight
-          R: '#e03131', // pluma/capa vermelha
-          H: '#adb5bd', // capacete
-          W: '#f1f3f5', // brilho do capacete
-          K: '#1a1d2b', // visor escuro
-          C: '#74c0fc', // olhos brilhantes no visor
-          S: '#ffd8a8', // queixo
-          B: armorTint, // armadura equipada!
-          Y: '#fcc419', // cinto/emblema dourado
-          D: armorTint, // pernas combinando com armadura
+          O: '#12101a',
+          R: isRemote ? '#20c997' : '#e03131', // Jogador 2 tem capa esmeralda!
+          H: isRemote ? '#ffd43b' : '#adb5bd',
+          W: '#f1f3f5',
+          K: '#1a1d2b',
+          C: isRemote ? '#ffe066' : '#74c0fc',
+          S: '#ffd8a8',
+          B: armorTint,
+          Y: '#fcc419',
+          D: armorTint,
         };
 
   drawMatrix(ctx, frame, pal, Math.round(x - 5), Math.round(y - 6 + bob), 2, flipX);
 
-  // Arma equipada na mao e rotacionada na direcao da mira
+  // Arma equipada na mao
   const handX = x + 11 + (flipX ? -4 : 4);
   const handY = y + 13 + bob;
-  const swingAmp = weaponId === 'elf_bow' || weaponId === 'flame_staff' ? 0.35 : 1.45;
+  const isRanged = weaponId === 'elf_bow' || weaponId === 'flame_staff' || weaponId === 'frost_wand';
+  const swingAmp = isRanged ? 0.35 : 1.45;
   const swingOffset =
     attackProgress > 0 ? Math.sin(attackProgress * Math.PI) * (flipX ? -swingAmp : swingAmp) : 0;
 
@@ -654,7 +758,6 @@ export function drawHero(
   ctx.rotate(aimAngle + swingOffset);
 
   if (weaponId === 'elf_bow') {
-    // Arco Elfico verde/madeira
     ctx.strokeStyle = '#12101a';
     ctx.lineWidth = 4;
     ctx.beginPath();
@@ -673,8 +776,23 @@ export function drawHero(
     ctx.stroke();
     ctx.fillStyle = '#51cf66';
     ctx.fillRect(6, -1, 12, 2);
+  } else if (weaponId === 'twin_daggers') {
+    ctx.fillStyle = '#12101a';
+    ctx.fillRect(0, -5, 14, 4);
+    ctx.fillRect(2, 2, 14, 4);
+    ctx.fillStyle = '#20c997';
+    ctx.fillRect(2, -4, 11, 2);
+    ctx.fillRect(4, 3, 11, 2);
+  } else if (weaponId === 'frost_wand') {
+    ctx.fillStyle = '#12101a';
+    ctx.fillRect(-2, -2, 16, 4);
+    ctx.fillStyle = '#74c0fc';
+    ctx.fillRect(-1, -1, 14, 2);
+    ctx.fillStyle = '#e3fafc';
+    ctx.fillRect(13, -4, 6, 8);
+    ctx.fillStyle = '#3bc9db';
+    ctx.fillRect(15, -2, 3, 4);
   } else if (weaponId === 'flame_staff') {
-    // Cajado Flamejante
     ctx.fillStyle = '#12101a';
     ctx.fillRect(-3, -2, 18, 5);
     ctx.fillStyle = '#7950f2';
@@ -687,8 +805,14 @@ export function drawHero(
     ctx.beginPath();
     ctx.arc(16, 0, 2.5, 0, Math.PI * 2);
     ctx.fill();
+  } else if (weaponId === 'thunder_spear') {
+    ctx.fillStyle = '#12101a';
+    ctx.fillRect(-4, -2, 24, 4);
+    ctx.fillStyle = '#fcc419';
+    ctx.fillRect(-3, -1, 18, 2);
+    ctx.fillStyle = '#fff9db';
+    ctx.fillRect(15, -3, 7, 6);
   } else if (weaponId === 'forge_axe') {
-    // Machado Pesado da Forja
     ctx.fillStyle = '#12101a';
     ctx.fillRect(-3, -2, 18, 5);
     ctx.fillStyle = '#8d5524';
@@ -700,7 +824,6 @@ export function drawHero(
     ctx.fillStyle = '#ffd43b';
     ctx.fillRect(16, -6, 2, 12);
   } else {
-    // Espada Runica padrao
     ctx.fillStyle = '#12101a';
     ctx.fillRect(-2, -3, 6, 6);
     ctx.fillStyle = '#fcc419';
@@ -724,89 +847,72 @@ export function drawEnemy(
   y: number,
   hurtFlash: boolean,
   t: number,
+  frozen = false,
 ): void {
-  const frameIdx = Math.floor(t * 6) % 2;
-  const bob = Math.round(Math.sin(t * 8) * 1.5);
+  const frameIdx = Math.floor(t * 6.5) % 2;
+  const bob = Math.round(Math.sin(t * 8 + x * 0.05) * 1.4);
+  const isMinion = kind === 'goblin' || kind === 'bat' || kind === 'imp';
 
-  ctx.fillStyle = 'rgba(0, 0, 0, 0.42)';
+  ctx.fillStyle = 'rgba(0, 0, 0, 0.38)';
   ctx.beginPath();
-  ctx.ellipse(x + 12, y + 25, 12, 4.5, 0, 0, Math.PI * 2);
+  ctx.ellipse(x + (isMinion ? 10 : 12), y + (isMinion ? 21 : 25), isMinion ? 9 : 12, 4, 0, 0, Math.PI * 2);
   ctx.fill();
 
   const mat =
     kind === 'slime'
-      ? frameIdx === 0
-        ? SLIME_FRAME_0
-        : SLIME_FRAME_1
+      ? frameIdx === 0 ? SLIME_FRAME_0 : SLIME_FRAME_1
       : kind === 'skeleton'
-        ? frameIdx === 0
-          ? SKELETON_FRAME_0
-          : SKELETON_FRAME_1
-        : frameIdx === 0
-          ? GARGOYLE_FRAME_0
-          : GARGOYLE_FRAME_1;
+        ? frameIdx === 0 ? SKELETON_FRAME_0 : SKELETON_FRAME_1
+        : kind === 'gargoyle'
+          ? frameIdx === 0 ? GARGOYLE_FRAME_0 : GARGOYLE_FRAME_1
+          : kind === 'goblin'
+            ? frameIdx === 0 ? GOBLIN_FRAME_0 : GOBLIN_FRAME_1
+            : kind === 'bat'
+              ? frameIdx === 0 ? BAT_FRAME_0 : BAT_FRAME_1
+              : frameIdx === 0 ? IMP_FRAME_0 : IMP_FRAME_1;
+
+  const ox = Math.round(x - (isMinion ? 2 : 4));
+  const oy = Math.round(y - (isMinion ? 4 : 6) + bob);
 
   if (hurtFlash) {
     const white: Record<string, string> = {
       O: '#ffffff', Y: '#ffffff', G: '#ffffff', L: '#ffffff', W: '#ffffff',
       D: '#ffffff', H: '#ffffff', E: '#ff8787', P: '#ffffff', S: '#ffffff',
+      B: '#ffffff', R: '#ffffff',
     };
-    drawMatrix(ctx, mat, white, Math.round(x - 4), Math.round(y - 6 + bob), 2, false);
+    drawMatrix(ctx, mat, white, ox, oy, 2, false);
     return;
   }
 
+  if (frozen) {
+    const ice: Record<string, string> = {
+      O: '#0b7285', Y: '#e3fafc', G: '#66d9e8', L: '#c5f6fa', W: '#ffffff',
+      D: '#15aabf', H: '#99e9f2', E: '#ffffff', P: '#3bc9db', S: '#66d9e8',
+      B: '#22b8cf', R: '#66d9e8',
+    };
+    drawMatrix(ctx, mat, ice, ox, oy, 2, false);
+    return;
+  }
+
+  if (kind === 'goblin') {
+    drawMatrix(ctx, mat, { O: '#12101a', G: '#40c057', L: '#8ce99a', E: '#ff6b6b', B: '#8d5524', Y: '#fcc419', D: '#5c3d24' }, ox, oy, 2, false);
+    return;
+  }
+  if (kind === 'bat') {
+    drawMatrix(ctx, mat, { O: '#12101a', P: '#845ef7', E: '#ff6b6b' }, ox, oy, 2, false);
+    return;
+  }
+  if (kind === 'imp') {
+    drawMatrix(ctx, mat, { O: '#12101a', R: '#fa5252', E: '#fff3bf', D: '#495057', Y: '#ff922b' }, ox, oy, 2, false);
+    return;
+  }
   if (kind === 'slime') {
-    drawMatrix(
-      ctx,
-      mat,
-      {
-        O: '#12101a',
-        Y: '#ffd43b', // coroa dourada
-        G: '#20c997',
-        L: '#96f2d7',
-        W: '#e6fcf5',
-        D: '#099268',
-      },
-      Math.round(x - 4),
-      Math.round(y - 6 + bob),
-      2,
-      false,
-    );
+    drawMatrix(ctx, mat, { O: '#12101a', Y: '#ffd43b', G: '#20c997', L: '#96f2d7', W: '#e6fcf5', D: '#099268' }, ox, oy, 2, false);
     return;
   }
-
   if (kind === 'skeleton') {
-    drawMatrix(
-      ctx,
-      mat,
-      {
-        O: '#12101a',
-        H: '#868e96',
-        W: '#f8f9fa',
-        E: '#ff6b6b', // olhos vermelhos brilhantes
-        P: '#9c36b5', // capa roxa
-      },
-      Math.round(x - 4),
-      Math.round(y - 6 + bob),
-      2,
-      false,
-    );
+    drawMatrix(ctx, mat, { O: '#12101a', H: '#868e96', W: '#f8f9fa', E: '#ff6b6b', P: '#9c36b5' }, ox, oy, 2, false);
     return;
   }
-
-  drawMatrix(
-    ctx,
-    mat,
-    {
-      O: '#12101a',
-      S: '#5c5f66',
-      D: '#343a40',
-      E: '#ff5722', // olhos de brasa
-      G: '#ffa94d', // nucleo de magma no peito
-    },
-    Math.round(x - 4),
-    Math.round(y - 6 + bob),
-    2,
-    false,
-  );
+  drawMatrix(ctx, mat, { O: '#12101a', S: '#5c5f66', D: '#343a40', E: '#ff5722', G: '#ffa94d' }, ox, oy, 2, false);
 }
