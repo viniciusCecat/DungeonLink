@@ -19,9 +19,14 @@
 // ============================================================
 // GPIO 34 pertence ao ADC1 (CH6). Evita conflito com ADC2 quando o BLE/Wi-Fi esta ativo.
 #define PIN_LDR      34   // Entrada analogica (divisor 3.3V -> LDR -> GPIO34 -> 10k -> GND)
-#define PIN_BUTTON   27   // Botao tatil para GND (INPUT_PULLUP, ativo em LOW)
+#define PIN_JOY_X    32   // Eixo X do joystick analogico opcional (VRx -> GPIO32 / ADC1_CH4)
+#define PIN_JOY_Y    33   // Eixo Y do joystick analogico opcional (VRy -> GPIO33 / ADC1_CH5)
+#define PIN_BUTTON   27   // Botao tatil / SW do joystick para GND (INPUT_PULLUP, ativo em LOW)
 #define PIN_LED_RED  26   // LED vermelho externo + resistor 220 ohm para GND
 #define PIN_LED_BLE   2   // LED azul onboard do ESP32 (indicador de conexao BLE)
+
+#define JOY_DEADZONE         520   // Zona morta ao redor do centro do joystick
+#define JOY_SEND_INTERVAL_MS 70UL  // Taxa de envio de movimento do joystick (~14 Hz)
 
 // Caso monte o divisor invertido (3.3V -> 10k -> GPIO34 -> LDR -> GND), altere para true
 #define LDR_INVERTED false

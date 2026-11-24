@@ -52,6 +52,14 @@ int lastButtonReading = HIGH;
 int stableButtonState = HIGH;
 unsigned long lastButtonDebounceMs = 0;
 
+// Joystick analogico fisico opcional (KY-023: VRx=D32, VRy=D33, SW=D27)
+bool joyHardwareDetected = false;
+int joyCenterX = 2048;
+int joyCenterY = 2048;
+int lastSentJoyX = 0;
+int lastSentJoyY = 0;
+unsigned long lastJoySampleMs = 0;
+
 // Maquina de estados nao-bloqueante para animacao de LED vermelho
 struct LedBlinkPattern {
   bool active = false;
@@ -84,6 +92,90 @@ void initLdrFilter() {
   ldrRawAvg = static_cast<int>(sum / LDR_AVG_WINDOW);
   ldrPct = map(ldrRawAvg, 0, 4095, 0, 100);
   isDark = (ldrRawAvg < LDR_DARK_ENTER);
+}
+
+void initJoystick() {
+  long sumX = 0, sumY = 0;
+  int minX = 4095, maxX = 0, minY = 4095, maxY = 0;
+  for (int i = 0; i < 16; i++) {
+    int rx = analogRead(PIN_JOY_X);
+    int ry = analogRead(PIN_JOY_Y);
+    sumX += rx;
+    sumY += ry;
+    if (rx < minX) minX = rx;
+    if (rx > maxX) maxX = rx;
+    if (ry < minY) minY = ry;
+    if (ry > maxY) maxY = ry;
+    delay(3);
+  }
+  int avgX = static_cast<int>(sumX / 16);
+  int avgY = static_cast<int>(sumY / 16);
+
+  // Detecta modulo KY-023 real (repouso estavel perto do meio ~1400..2700, sem ruido de pino solto)
+  if (avgX >= 1350 && avgX <= 2750 && avgY >= 1350 && avgY <= 2750 &&
+      (maxX - minX) < 300 && (maxY - minY) < 300) {
+    joyHardwareDetected = true;
+    joyCenterX = avgX;
+    joyCenterY = avgY;
+    DL_LOGF("[JOY] Joystick fisico detectado em D32/D33 (centro=%d,%d)\n", joyCenterX, joyCenterY);
+  } else {
+    joyHardwareDetected = false;
+    DL_LOGF("[JOY] Sem joystick analogico em D32/D33 (avg=%d,%d) - usando apenas botao D27\n", avgX, avgY);
+  }
+}
+
+void sendNotifyJson(const String& json);
+
+void sendSignedJoyPacket(int jx, int jy, int btn) {
+  if (!bleConnected || !txChr || txChr.getSubscribedCount() == 0) {
+    return;
+  }
+  txSeq++;
+  String canonical = DungeonSecurity::buildJoyCanonical(txSeq, jx, jy, btn);
+  String mac = DungeonSecurity::computeHmacHex16(canonical);
+
+  JsonDocument doc;
+  doc["v"] = 1;
+  doc["type"] = "joy";
+  doc["seq"] = txSeq;
+  doc["x"] = jx;
+  doc["y"] = jy;
+  doc["btn"] = btn;
+  doc["mac"] = mac;
+
+  String out;
+  serializeJson(doc, out);
+  sendNotifyJson(out);
+}
+
+void pollPhysicalJoystick(unsigned long now) {
+  if (!joyHardwareDetected || !bleConnected) return;
+  if (now - lastJoySampleMs < JOY_SEND_INTERVAL_MS) return;
+  lastJoySampleMs = now;
+
+  int rawX = analogRead(PIN_JOY_X);
+  int rawY = analogRead(PIN_JOY_Y);
+  int dx = rawX - joyCenterX;
+  int dy = rawY - joyCenterY;
+
+  int jx = 0;
+  int jy = 0;
+  if (abs(dx) > JOY_DEADZONE) {
+    int span = dx > 0 ? max(400, 4095 - joyCenterX) : max(400, joyCenterX);
+    jx = constrain((dx * 100) / span, -100, 100);
+  }
+  if (abs(dy) > JOY_DEADZONE) {
+    int span = dy > 0 ? max(400, 4095 - joyCenterY) : max(400, joyCenterY);
+    jy = constrain((dy * 100) / span, -100, 100);
+  }
+
+  bool changed = (abs(jx - lastSentJoyX) >= 12) || (abs(jy - lastSentJoyY) >= 12) ||
+                 ((jx == 0 && jy == 0) && (lastSentJoyX != 0 || lastSentJoyY != 0));
+  if (changed) {
+    lastSentJoyX = jx;
+    lastSentJoyY = jy;
+    sendSignedJoyPacket(jx, jy, 0);
+  }
 }
 
 void sampleLdrAndApplyLocalRule(bool& stateChanged) {
@@ -493,8 +585,11 @@ void setup() {
 
   analogReadResolution(12);
   analogSetPinAttenuation(PIN_LDR, ADC_11db);
+  analogSetPinAttenuation(PIN_JOY_X, ADC_11db);
+  analogSetPinAttenuation(PIN_JOY_Y, ADC_11db);
 
   initLdrFilter();
+  initJoystick();
   targetLedState = isDark;
   digitalWrite(PIN_LED_RED, targetLedState ? HIGH : LOW);
 
@@ -541,6 +636,9 @@ void loop() {
       }
     }
   }
+
+  // 3b. Leitura do joystick fisico opcional (D32/D33)
+  pollPhysicalJoystick(now);
 
   // 4. Processa comandos BLE recebidos fora do callback
   String cmdToRun = "";

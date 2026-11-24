@@ -140,6 +140,20 @@ inline String buildTxCanonical(
   return s;
 }
 
+inline String buildJoyCanonical(uint32_t seq, int jx, int jy, int btn) {
+  String s;
+  s.reserve(40);
+  s += "joy|";
+  s += String(seq);
+  s += '|';
+  s += String(jx);
+  s += '|';
+  s += String(jy);
+  s += '|';
+  s += String(btn);
+  return s;
+}
+
 inline String buildRxCanonical(
   const char* type,
   uint32_t seq,

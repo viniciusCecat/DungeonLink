@@ -9,6 +9,7 @@ interface GameCanvasProps {
   snapshot: GameSnapshot;
   light: LightState;
   connected: boolean;
+  hwJoyRef: React.MutableRefObject<{ x: number; y: number; active: boolean }>;
   onRequestNewDungeon: () => void;
   onRetryDungeon: () => void;
 }
@@ -18,6 +19,7 @@ export const GameCanvas: React.FC<GameCanvasProps> = ({
   snapshot,
   light,
   connected,
+  hwJoyRef,
   onRequestNewDungeon,
   onRetryDungeon,
 }) => {
@@ -82,8 +84,20 @@ export const GameCanvas: React.FC<GameCanvasProps> = ({
       if (!inventoryOpen) {
         const kx = (keysRef.current.right ? 1 : 0) - (keysRef.current.left ? 1 : 0);
         const ky = (keysRef.current.down ? 1 : 0) - (keysRef.current.up ? 1 : 0);
-        const moveX = Math.abs(joyRef.current.x) > 0.05 ? joyRef.current.x : kx;
-        const moveY = Math.abs(joyRef.current.y) > 0.05 ? joyRef.current.y : ky;
+        const hwx = hwJoyRef.current.active ? hwJoyRef.current.x : 0;
+        const hwy = hwJoyRef.current.active ? hwJoyRef.current.y : 0;
+        const moveX =
+          Math.abs(joyRef.current.x) > 0.05
+            ? joyRef.current.x
+            : Math.abs(hwx) > 0.05
+              ? hwx
+              : kx;
+        const moveY =
+          Math.abs(joyRef.current.y) > 0.05
+            ? joyRef.current.y
+            : Math.abs(hwy) > 0.05
+              ? hwy
+              : ky;
 
         engine.update(dt, {
           moveX,

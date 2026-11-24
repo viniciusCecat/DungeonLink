@@ -8,7 +8,7 @@ export const LDR_DARK_EXIT = 780;
 
 export type LightState = 'bright' | 'dark';
 export type LedMode = 'auto' | 'manual';
-export type TxPacketType = 'dungeon_req' | 'telemetry' | 'err';
+export type TxPacketType = 'dungeon_req' | 'telemetry' | 'joy' | 'err';
 export type RxPacketType = 'ack' | 'cmd';
 
 export interface Esp32DataPayload {
@@ -25,6 +25,16 @@ export interface Esp32DataPayload {
   mac: string;
 }
 
+export interface Esp32JoyPayload {
+  v: 1;
+  type: 'joy';
+  seq: number;
+  x: number;
+  y: number;
+  btn: 0 | 1;
+  mac: string;
+}
+
 export interface Esp32ErrPayload {
   v: 1;
   type: 'err';
@@ -32,7 +42,7 @@ export interface Esp32ErrPayload {
   msg: string;
 }
 
-export type IncomingEsp32Payload = Esp32DataPayload | Esp32ErrPayload;
+export type IncomingEsp32Payload = Esp32DataPayload | Esp32JoyPayload | Esp32ErrPayload;
 
 export interface OutgoingAppPayload {
   v: 1;
@@ -230,6 +240,10 @@ export function buildTxCanonical(
   return `${type}|${seq}|${dungeonId}|${light}|${ldrRaw}|${led}|${mode}`;
 }
 
+export function buildJoyCanonical(seq: number, x: number, y: number, btn: 0 | 1): string {
+  return `joy|${seq}|${x}|${y}|${btn}`;
+}
+
 export function buildRxCanonical(
   type: RxPacketType,
   seq: number,
@@ -302,6 +316,24 @@ export function verifyIncomingPayload(
       rawJson: trimmed,
       payload: { v: 1, type: 'err', code, msg },
     };
+  }
+
+  if (parsed.type === 'joy') {
+    const seq = Number(parsed.seq);
+    const x = Number(parsed.x);
+    const y = Number(parsed.y);
+    const btn = Number(parsed.btn) === 1 ? 1 : 0;
+    const mac = typeof parsed.mac === 'string' ? parsed.mac : '';
+    if (!Number.isInteger(seq) || !Number.isFinite(x) || !Number.isFinite(y)) {
+      return { ok: false, hmacValid: false, rawJson: trimmed, error: 'Payload joy invalido' };
+    }
+    const payload: Esp32JoyPayload = { v: 1, type: 'joy', seq, x, y, btn, mac };
+    if (!secret) {
+      return { ok: false, hmacValid: false, rawJson: trimmed, payload, error: 'Sem segredo' };
+    }
+    const expected = computeHmacHex16(secret, buildJoyCanonical(seq, x, y, btn));
+    const hmacValid = constantTimeHexEquals16(mac, expected);
+    return { ok: hmacValid, hmacValid, rawJson: trimmed, payload };
   }
 
   if (parsed.type !== 'dungeon_req' && parsed.type !== 'telemetry') {

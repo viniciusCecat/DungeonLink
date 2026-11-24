@@ -287,6 +287,12 @@ export class DungeonBleService {
     for (const line of lines) {
       const verified = verifyIncomingPayload(line);
       if (verified.payload) {
+        if (verified.payload.type === 'joy') {
+          if (verified.ok) {
+            this.callbacks.onPayload(verified.payload, verified.rawJson, verified.hmacValid);
+          }
+          continue;
+        }
         let summary = '';
         if (verified.payload.type === 'err') {
           summary = `ERR ${verified.payload.code}: ${verified.payload.msg}`;

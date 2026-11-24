@@ -20,7 +20,8 @@ html,
 body {
   margin: 0;
   padding: 0;
-  background: var(--bg);
+  background: radial-gradient(circle at 50% 0%, #151c33 0%, #090c14 68%);
+  min-height: 100vh;
   color: var(--text);
   font-family: system-ui, -apple-system, 'Segoe UI', Roboto, sans-serif;
   -webkit-tap-highlight-color: transparent;
@@ -28,12 +29,154 @@ body {
 }
 
 .app-shell {
-  max-width: 980px;
+  max-width: 960px;
   margin: 0 auto;
-  padding: 12px 14px 28px;
+  padding: 10px 12px 24px;
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+
+.game-topbar {
+  background: linear-gradient(180deg, #192138 0%, #111626 100%);
+  border: 1.5px solid #323e61;
+  border-radius: 14px;
+  padding: 9px 12px;
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: space-between;
+  align-items: center;
+  gap: 8px;
+  box-shadow: 0 6px 20px rgba(0, 0, 0, 0.38);
+}
+
+.game-brand {
+  display: flex;
+  align-items: center;
+  gap: 9px;
+}
+
+.brand-crest {
+  width: 34px;
+  height: 34px;
+  border-radius: 9px;
+  background: linear-gradient(135deg, #4c6ef5 0%, #7950f2 100%);
+  border: 1.5px solid #91a7ff;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 1.05rem;
+  box-shadow: 0 0 14px rgba(76, 110, 245, 0.45);
+}
+
+.game-brand h1 {
+  margin: 0;
+  font-size: 1.05rem;
+  font-weight: 900;
+  letter-spacing: 0.08em;
+  color: #f8f9fa;
+}
+
+.game-brand small {
+  display: block;
+  color: #8fa0cc;
+  font-size: 0.7rem;
+  letter-spacing: 0.04em;
+}
+
+.game-topbar-right {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 6px;
+}
+
+.btn-connect-mini {
+  background: linear-gradient(180deg, #3b5bdb, #2b44b5);
+  border: 1px solid #748ffc;
+  color: #ffffff;
+  padding: 6px 11px;
+  font-size: 0.78rem;
+  border-radius: 999px;
+}
+
+.options-trigger {
+  background: linear-gradient(180deg, #252f4a, #192036);
+  border: 1px solid #495985;
+  color: #edf2ff;
+  padding: 6px 12px;
+  font-size: 0.8rem;
+  border-radius: 999px;
+}
+
+.options-trigger.active {
+  background: var(--primary);
+  border-color: #91a7ff;
+}
+
+.options-backdrop {
+  position: fixed;
+  inset: 0;
+  z-index: 70;
+  background: rgba(5, 8, 16, 0.86);
+  display: flex;
+  align-items: flex-start;
+  justify-content: center;
+  padding: 14px;
+  overflow-y: auto;
+}
+
+.options-drawer {
+  width: 100%;
+  max-width: 840px;
+  background: #121726;
+  border: 2px solid #3c4d7a;
+  border-radius: 16px;
+  padding: 16px;
   display: flex;
   flex-direction: column;
   gap: 12px;
+  box-shadow: 0 20px 56px rgba(0, 0, 0, 0.72);
+}
+
+.options-header {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: space-between;
+  align-items: center;
+  gap: 10px;
+  border-bottom: 1px solid var(--border);
+  padding-bottom: 10px;
+}
+
+.options-header h2 {
+  margin: 0;
+  font-size: 1.15rem;
+}
+
+.options-tabs {
+  display: grid;
+  grid-template-columns: repeat(2, 1fr);
+  gap: 8px;
+}
+
+.options-body {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+
+.hw-joy-card {
+  border-color: #38d9a9;
+  background: linear-gradient(180deg, #14222b 0%, #141927 100%);
+}
+
+.hw-joy-card code {
+  background: rgba(56, 217, 169, 0.14);
+  color: #96f2d7;
+  padding: 1px 5px;
+  border-radius: 4px;
+  font-size: 0.78rem;
 }
 
 .top-bar {
@@ -248,11 +391,14 @@ body {
 .canvas-frame {
   position: relative;
   background: #05070d;
-  border: 2px solid var(--border);
-  border-radius: 12px;
+  border: 2.5px solid #3c4b75;
+  border-radius: 14px;
   overflow: hidden;
   width: 100%;
   aspect-ratio: 16 / 10;
+  box-shadow:
+    0 10px 30px rgba(0, 0, 0, 0.55),
+    0 0 0 1px rgba(116, 143, 252, 0.18);
 }
 
 .pixel-canvas {
